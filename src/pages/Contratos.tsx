@@ -1,0 +1,483 @@
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ContratoFormModal } from "@/components/forms/ContratoFormModal";
+import { ContratoDetailModal } from "@/components/modals/ContratoDetailModal";
+import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
+import { TipoContratoManagerModal } from "@/components/modals/TipoContratoManagerModal";
+import { useData } from "@/contexts/DataContext";
+import { type ContratoFormData, getTipoContratoLabel } from "@/lib/validations";
+import { 
+  Plus, 
+  Search, 
+  FileText, 
+  Calendar,
+  DollarSign,
+  Building2,
+  User,
+  Edit,
+  Trash2,
+  Eye,
+  Download,
+  AlertTriangle,
+  Settings
+} from "lucide-react";
+import { toast } from "sonner";
+
+export default function Contratos() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingContrato, setEditingContrato] = useState<any>(null);
+  const [viewingContrato, setViewingContrato] = useState<any>(null);
+  const [deletingContrato, setDeletingContrato] = useState<any>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const { contratos, bancos, addContrato, updateContrato, deleteContrato } = useData();
+
+  // Filtro por banco via URL
+  const bancoFilter = searchParams.get('banco');
+  const bancoFiltrado = bancoFilter ? bancos.find(b => b.id === bancoFilter) : null;
+
+  useEffect(() => {
+    if (bancoFiltrado) {
+      toast.info(`Mostrando contratos do ${bancoFiltrado.nome}`);
+    }
+  }, [bancoFiltrado]);
+
+  const handleCreateContrato = async (data: ContratoFormData) => {
+    try {
+      addContrato(data as any);
+      toast.success('Contrato cadastrado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao cadastrar contrato');
+      throw error;
+    }
+  };
+
+  const handleEditContrato = async (data: ContratoFormData) => {
+    try {
+      if (editingContrato) {
+        updateContrato(editingContrato.id, data as any);
+        setEditingContrato(null);
+        toast.success('Contrato atualizado com sucesso!');
+      }
+    } catch (error) {
+      toast.error('Erro ao atualizar contrato');
+      throw error;
+    }
+  };
+
+  const openEditModal = (contrato: any) => {
+    setEditingContrato(contrato);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingContrato(null);
+  };
+
+  const handleViewContrato = (contrato: any) => {
+    setViewingContrato(contrato);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleDeleteContrato = (contrato: any) => {
+    setDeletingContrato(contrato);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeleteContrato = async () => {
+    try {
+      if (deletingContrato) {
+        deleteContrato(deletingContrato.id);
+        toast.success('Contrato excluído com sucesso!');
+        setIsDeleteModalOpen(false);
+        setDeletingContrato(null);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao excluir contrato');
+    }
+  };
+
+  const handleDownloadContrato = (contrato: any) => {
+    // Simular download de contrato
+    toast.info(`Download do contrato #${contrato.id.toString().padStart(4, '0')} iniciado...`);
+    // Aqui você pode implementar a lógica real de download/geração de PDF
+  };
+
+  const handleTiposChange = (tipos: any[]) => {
+    // Forçar atualização dos tipos de contrato
+    // Isso será usado para atualizar os selects quando necessário
+    console.log('Tipos de contrato atualizados:', tipos);
+  };
+
+  const filteredContratos = contratos.filter(contrato => {
+    const matchesSearch = contrato.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contrato.bancoNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contrato.valorTotal.toString().includes(searchTerm.replace(/[R$.,\s]/g, ""));
+    
+    const matchesBanco = bancoFilter ? contrato.bancoId === bancoFilter : true;
+    
+    return matchesSearch && matchesBanco;
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ativo": return "bg-success text-success-foreground";
+      case "pendente": return "bg-warning text-warning-foreground";
+      case "finalizado": return "bg-info text-info-foreground";
+      default: return "";
+    }
+  };
+
+  const totalReceita = contratos
+    .filter(c => c.status === "ativo" || c.status === "finalizado")
+    .reduce((acc, c) => {
+      // Corrigir parsing de moeda brasileira
+      const receitaString = c.receitaAgente
+        .replace(/[R$\s]/g, '') // Remove R$ e espaços
+        .replace(/\./g, '')      // Remove pontos (separadores de milhares)
+        .replace(',', '.');      // Substitui vírgula por ponto decimal
+      const receita = parseFloat(receitaString);
+      return acc + (isNaN(receita) ? 0 : receita);
+    }, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-primary-dark">Contratos</h1>
+          <p className="text-muted-foreground">Gerencie todos os contratos de crédito</p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setIsTipoManagerModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Tipos de Contrato
+          </Button>
+          <Button 
+            className="bg-gradient-primary hover:opacity-90"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Contrato
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="bg-gradient-card shadow-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-primary p-2 rounded-lg">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Contratos</p>
+                <p className="text-xl font-bold text-primary-dark">{contratos.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-success p-2 rounded-lg">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Contratos Ativos</p>
+                <p className="text-xl font-bold text-success">
+                  {contratos.filter(c => c.status === "ativo").length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-warning p-2 rounded-lg">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pendentes</p>
+                <p className="text-xl font-bold text-warning">
+                  {contratos.filter(c => c.status === "pendente").length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-success p-2 rounded-lg">
+                <DollarSign className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Receita Total</p>
+                <p className="text-xl font-bold text-success">
+                  R$ {totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtro Ativo */}
+      {bancoFiltrado && (
+        <Card className="shadow-card border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-primary-dark">
+                    Filtro ativo: {bancoFiltrado.nome}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando apenas contratos deste banco
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.history.replaceState({}, '', '/contratos')}
+              >
+                Remover Filtro
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Search and Filters */}
+      <Card className="shadow-card">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar por cliente, banco ou valor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline">
+                Filtros Avançados
+              </Button>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Exportar
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contracts List */}
+      <div className="grid gap-4">
+        {filteredContratos.map((contrato) => (
+          <Card key={contrato.id} className="shadow-card hover:shadow-card-hover transition-all">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-primary-dark">
+                        Contrato #{contrato.id.toString().padStart(4, '0')}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <User className="h-4 w-4" />
+                          {contrato.clienteNome}
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Building2 className="h-4 w-4" />
+                          {contrato.bancoNome}
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <FileText className="h-4 w-4" />
+                          {getTipoContratoLabel(contrato.tipoContrato)}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant="secondary"
+                      className={getStatusColor(contrato.status)}
+                    >
+                      {contrato.status === "ativo" ? "Ativo" : 
+                       contrato.status === "pendente" ? "Pendente" : "Finalizado"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="bg-accent/50 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Data do Empréstimo</p>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{contrato.dataEmprestimo}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-accent/50 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4 text-success" />
+                        <span className="font-bold text-success">
+                          R$ {contrato.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-accent/50 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
+                      <span className="font-medium">{contrato.parcelas}x {contrato.valorParcela}</span>
+                    </div>
+
+                    <div className="bg-accent/50 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Sua Receita</p>
+                      <span className="font-bold text-primary">{contrato.receitaAgente}</span>
+                    </div>
+                  </div>
+
+                  {contrato.observacoes && (
+                    <div className="bg-accent/30 p-3 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">Observações:</p>
+                      <p className="text-sm">{contrato.observacoes}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleViewContrato(contrato)}
+                    title="Visualizar detalhes"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => openEditModal(contrato)}
+                    title="Editar contrato"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleDownloadContrato(contrato)}
+                    title="Baixar contrato"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={contrato.status === 'ativo' 
+                      ? "text-warning hover:text-warning" 
+                      : "text-destructive hover:text-destructive"
+                    }
+                    onClick={() => handleDeleteContrato(contrato)}
+                    title={contrato.status === 'ativo' 
+                      ? "Contrato ativo - Clique para forçar exclusão" 
+                      : "Excluir contrato"
+                    }
+                  >
+                    {contrato.status === 'ativo' ? (
+                      <AlertTriangle className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredContratos.length === 0 && (
+        <Card className="shadow-card">
+          <CardContent className="p-8 text-center">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-muted-foreground mb-2">
+              Nenhum contrato encontrado
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Tente ajustar os filtros de busca ou cadastre um novo contrato.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal para criar/editar contratos */}
+      <ContratoFormModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onSubmit={editingContrato ? handleEditContrato : handleCreateContrato}
+        initialData={editingContrato}
+        mode={editingContrato ? 'edit' : 'create'}
+      />
+
+      {/* Modal de Detalhes */}
+      <ContratoDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setViewingContrato(null);
+        }}
+        contrato={viewingContrato}
+      />
+
+      {/* Modal de Confirmação de Exclusão */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingContrato(null);
+        }}
+        onConfirm={confirmDeleteContrato}
+        title={deletingContrato?.status === 'ativo' 
+          ? "Excluir Contrato Ativo" 
+          : "Excluir Contrato"
+        }
+        description={
+          deletingContrato?.status === 'ativo'
+            ? "ATENÇÃO: Este contrato ainda está ATIVO! Excluir um contrato ativo pode afetar os cálculos de receita e métricas do sistema. Tem certeza que deseja continuar?"
+            : "Tem certeza que deseja excluir este contrato? Esta ação não pode ser desfeita."
+        }
+        itemName={deletingContrato ? `#${deletingContrato.id.toString().padStart(4, '0')} - ${deletingContrato.clienteNome}` : undefined}
+      />
+
+      {/* Modal do Gerenciador de Tipos de Contrato */}
+      <TipoContratoManagerModal
+        isOpen={isTipoManagerModalOpen}
+        onClose={() => setIsTipoManagerModalOpen(false)}
+        onTiposChange={handleTiposChange}
+      />
+    </div>
+  );
+}
