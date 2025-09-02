@@ -170,11 +170,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Carregando perfil do usuário:', userId);
       
-      // Timeout de 3 segundos para carregamento do perfil
+      // Timeout de 8 segundos para carregamento do perfil
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Timeout no carregamento do perfil'));
-        }, 3000);
+        }, 8000);
       });
 
       const profilePromise = supabase
@@ -193,14 +193,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (error) {
         console.error('Erro ao carregar perfil:', error);
         
-        // Se o perfil não existir, pode ser que o trigger não tenha funcionado
-        if (error.code === 'PGRST116') { // No rows returned
-          console.warn('Perfil não encontrado. Pode ser necessário criar manualmente.');
-          setError('Perfil de usuário não encontrado. Entre em contato com o suporte.');
-          return;
+        // Se o perfil não existir ou houver problemas, criar um perfil básico
+        if (error.code === 'PGRST116' || error.message?.includes('Timeout')) {
+          console.warn('Perfil não encontrado ou timeout. Criando perfil básico...');
+          
+          // Tentar obter dados do usuário autenticado
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            const basicUserData = {
+              id: user.id,
+              nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
+              email: user.email || '',
+              cargo: user.user_metadata?.cargo || 'Usuário',
+              avatar: user.user_metadata?.avatar || undefined
+            };
+            
+            console.log('Usando perfil básico:', basicUserData);
+            setUser(basicUserData);
+            
+            // Salvar no localStorage
+            try {
+              localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
+            } catch (error) {
+              console.warn('Erro ao salvar no localStorage:', error);
+            }
+            
+            return;
+          }
         }
         
-        setError('Erro ao carregar perfil do usuário');
+        // Se não conseguir criar perfil básico, mostrar erro mas não bloquear
+        console.warn('Não foi possível carregar perfil, continuando sem dados de perfil');
+        setError(null); // Não mostrar erro que impeça o uso
         return;
       }
 
@@ -226,10 +251,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error: any) {
       console.error('Erro ao carregar perfil:', error);
       
-      if (error.message === 'Timeout no carregamento do perfil') {
-        setError('Timeout ao carregar perfil. Verifique sua conexão.');
-      } else {
-        setError('Erro ao carregar perfil do usuário');
+      // Em qualquer erro, tentar criar um perfil básico para não bloquear o usuário
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const fallbackUserData = {
+            id: user.id,
+            nome: user.email?.split('@')[0] || 'Usuário',
+            email: user.email || '',
+            cargo: 'Usuário',
+            avatar: undefined
+          };
+          
+          console.log('Usando perfil fallback:', fallbackUserData);
+          setUser(fallbackUserData);
+          
+          try {
+            localStorage.setItem('maiacred_user', JSON.stringify(fallbackUserData));
+          } catch (storageError) {
+            console.warn('Erro ao salvar fallback no localStorage:', storageError);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Erro ao criar perfil fallback:', fallbackError);
+        setError('Problemas de conectividade. Algumas funcionalidades podem estar limitadas.');
       }
     }
   };
@@ -270,7 +316,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Verificar se o usuário foi confirmado automaticamente
         if (authData.user.email_confirmed_at) {
           console.log('Usuário confirmado automaticamente');
-          await loadUserProfile(authData.user.id);
+          try {
+            await loadUserProfile(authData.user.id);
+          } catch (profileError) {
+            console.error('Erro no carregamento do perfil após registro:', profileError);
+          }
         } else {
           console.log('Usuário criado mas não confirmado. Fazendo login direto...');
           // Se não foi confirmado, mas existe, tentar fazer login direto
@@ -340,8 +390,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (authData.user) {
         console.log('Login bem-sucedido. Carregando perfil...');
-        await loadUserProfile(authData.user.id);
-        setIsLoading(false);
+        try {
+          await loadUserProfile(authData.user.id);
+        } catch (profileError) {
+          console.error('Erro no carregamento do perfil, mas login foi bem-sucedido:', profileError);
+          // Não bloquear o login se houver erro no perfil
+        } finally {
+          setIsLoading(false);
+        }
         return true;
       }
       
