@@ -160,10 +160,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           async (event, session) => {
             if (!isMounted) return;
 
+            console.log('Auth state mudou:', event, session?.user?.id);
+            
             if (event === 'SIGNED_IN' && session?.user) {
-              await loadUserProfile(session.user.id);
+              try {
+                await loadUserProfile(session.user.id);
+              } catch (profileError) {
+                console.error('Erro ao carregar perfil no state change:', profileError);
+              }
             } else if (event === 'SIGNED_OUT') {
+              console.log('🔓 Evento SIGNED_OUT detectado - limpando dados');
               setUser(null);
+              localStorage.removeItem('maiacred_user');
             }
             
             setIsLoading(false);
@@ -190,11 +198,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Carregando perfil do usuário:', userId);
       
-      // Timeout aumentado para carregamento do perfil (15 segundos)
+      // Timeout otimizado para carregamento do perfil (8 segundos)
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Timeout no carregamento do perfil'));
-        }, 15000); // Aumentado de 8s para 15s
+        }, 8000); // Reduzido de 15s para 8s
       });
 
       const profilePromise = supabase
@@ -215,31 +223,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         // Se o perfil não existir ou houver problemas, criar um perfil básico
         if (error.code === 'PGRST116' || error.message?.includes('Timeout')) {
-          console.warn('Perfil não encontrado ou timeout. Criando perfil básico...');
+          if (error.message?.includes('Timeout')) {
+            console.warn('⚠️ Timeout no carregamento do perfil - criando perfil básico');
+          } else {
+            console.warn('Perfil não encontrado - criando perfil básico');
+          }
           
-          // Tentar obter dados do usuário autenticado
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          if (user) {
-            const basicUserData = {
-              id: user.id,
-              nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
-              email: user.email || '',
-              cargo: user.user_metadata?.cargo || 'Usuário',
-              avatar: user.user_metadata?.avatar || undefined
-            };
+          // Tentar obter dados do usuário autenticado com timeout menor
+          try {
+            const getUserPromise = supabase.auth.getUser();
+            const timeoutUserPromise = new Promise((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Timeout ao obter dados do usuário'));
+              }, 3000); // Timeout de 3s para getUser
+            });
             
-            console.log('Usando perfil básico:', basicUserData);
-            setUser(basicUserData);
+            const { data: { user } } = await Promise.race([
+              getUserPromise,
+              timeoutUserPromise
+            ]) as any;
             
-            // Salvar no localStorage
-            try {
-              localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
-            } catch (error) {
-              console.warn('Erro ao salvar no localStorage:', error);
+            if (user) {
+              const basicUserData = {
+                id: user.id,
+                nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
+                email: user.email || '',
+                cargo: user.user_metadata?.cargo || 'Usuário',
+                avatar: user.user_metadata?.avatar || undefined
+              };
+              
+              console.log('Usando perfil básico:', basicUserData);
+              setUser(basicUserData);
+              
+              // Salvar no localStorage
+              try {
+                localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
+              } catch (error) {
+                console.warn('Erro ao salvar no localStorage:', error);
+              }
+              
+              return;
             }
-            
-            return;
+          } catch (userError) {
+            console.warn('Erro ou timeout ao obter dados do usuário:', userError);
           }
         }
         
@@ -467,28 +493,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async (): Promise<void> => {
     setIsLoading(true);
+    setError(null);
     
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Erro no logout:', error);
-        setError(error.message);
-      }
-      
+      // Limpar estado imediatamente, independente da resposta do Supabase
       setUser(null);
       
-      // Limpar localStorage
+      // Limpar localStorage imediatamente
       try {
         localStorage.removeItem('maiacred_user');
+        console.log('✓ Dados locais limpos com sucesso');
       } catch (error) {
         console.warn('Erro ao limpar localStorage:', error);
       }
+      
+      // Tentar fazer logout no Supabase com timeout menor
+      const logoutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Timeout no logout'));
+        }, 3000); // Timeout de apenas 3 segundos
+      });
+      
+      try {
+        const { error } = await Promise.race([
+          logoutPromise,
+          timeoutPromise
+        ]) as any;
+        
+        if (error) {
+          console.warn('Aviso no logout do Supabase:', error.message);
+          // Não definir como erro crítico, pois dados locais já foram limpos
+        } else {
+          console.log('✓ Logout do Supabase realizado com sucesso');
+        }
+      } catch (timeoutError) {
+        console.warn('⚠️ Timeout no logout do Supabase, mas dados locais foram limpos');
+        // Continuar normalmente, dados locais já foram limpos
+      }
+      
     } catch (error) {
       console.error('Erro no logout:', error);
-      setError('Erro inesperado durante o logout');
+      // Mesmo com erro, garantir que usuário seja deslogado localmente
+      setUser(null);
+      try {
+        localStorage.removeItem('maiacred_user');
+      } catch (storageError) {
+        console.warn('Erro ao limpar localStorage no catch:', storageError);
+      }
+      setError('Logout realizado localmente. Pode haver problemas de conectividade.');
     } finally {
       setIsLoading(false);
+      console.log('🔓 Logout finalizado - usuário desconectado');
     }
   };
 

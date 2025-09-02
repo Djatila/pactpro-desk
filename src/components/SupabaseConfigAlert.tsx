@@ -15,8 +15,11 @@ export function SupabaseConfigAlert({ error, onDismiss }: SupabaseConfigAlertPro
 
   const isUserExistsError = error?.includes('já está cadastrado') ||
                            error?.includes('User already registered');
+                           
+  const isTimeoutError = error?.includes('Timeout') ||
+                        error?.includes('conectividade');
 
-  if (!isConfigError && !isUserExistsError) {
+  if (!isConfigError && !isUserExistsError && !isTimeoutError) {
     return null;
   }
 
@@ -35,6 +38,55 @@ export function SupabaseConfigAlert({ error, onDismiss }: SupabaseConfigAlertPro
   const openInstructions = () => {
     window.open('/FIX_SUPABASE_CONFIG.md', '_blank');
   };
+
+  // Alerta para problemas de timeout/conectividade
+  if (isTimeoutError) {
+    return (
+      <Alert className="border-orange-200 bg-orange-50 text-orange-800 mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle className="text-orange-800 font-semibold">
+          🔄 Problemas de Conectividade
+        </AlertTitle>
+        <AlertDescription className="text-orange-700 mt-2">
+          <p className="mb-3">
+            Detectamos <strong>timeouts</strong> na conexão com o servidor.
+            A aplicação continuará funcionando em modo offline.
+          </p>
+          
+          <div className="bg-orange-100 p-3 rounded-md text-sm mb-3">
+            <p className="font-medium mb-2">💡 Dicas para Melhorar:</p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li>Feche outras abas que consomem banda</li>
+              <li>Verifique sua conexão Wi-Fi ou cabo</li>
+              <li>Experimente recarregar a página (Ctrl+F5)</li>
+              <li>PCs podem ter conectividade mais lenta que celulares</li>
+            </ul>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            <Button 
+              onClick={() => window.location.reload()}
+              size="sm"
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              Recarregar Página
+            </Button>
+            
+            {onDismiss && (
+              <Button 
+                onClick={onDismiss}
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-100"
+              >
+                Continuar Offline
+              </Button>
+            )}
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   // Alerta para usuário já existente
   if (isUserExistsError) {
