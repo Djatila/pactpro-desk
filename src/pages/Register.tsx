@@ -63,7 +63,7 @@ export default function Register() {
       if (success) {
         setSuccess('Conta criada com sucesso! Redirecionando...');
         setTimeout(() => {
-          navigate('/');
+          navigate('/dashboard');
         }, 2000);
       } else {
         setError('Erro ao criar conta. Tente novamente.');

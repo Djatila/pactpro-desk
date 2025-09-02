@@ -40,7 +40,7 @@ export default function Login() {
       const success = await login(data.email, data.password);
       if (success) {
         console.log('Login bem-sucedido, redirecionando...');
-        navigate('/');
+        navigate('/dashboard');
       } else {
         const errorMsg = authError || 'Email ou senha incorretos';
         setError(errorMsg);

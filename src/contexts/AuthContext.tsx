@@ -46,21 +46,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   // Verificar sessão do usuário e carregar perfil
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const getSession = async () => {
       try {
+        // Timeout de 5 segundos para verificação de sessão
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Timeout na verificação de sessão'));
+          }, 5000);
+        });
+
+        // Verificação inicial rápida - tentar localStorage primeiro
+        if (!initialCheckDone) {
+          try {
+            const storedUser = localStorage.getItem('maiacred_user');
+            if (storedUser) {
+              const parsedUser = JSON.parse(storedUser);
+              setUser(parsedUser);
+              setIsLoading(false);
+              setInitialCheckDone(true);
+              // Verificar sessão em background
+              setTimeout(() => getSession(), 100);
+              return;
+            }
+          } catch (error) {
+            console.warn('Erro ao ler localStorage:', error);
+          }
+          setInitialCheckDone(true);
+        }
+
         // Verificar se o Supabase está configurado
         if (!supabase || typeof supabase.auth?.getSession !== 'function') {
           console.warn('⚠️ Supabase não configurado. Funcionando em modo offline.');
-          setIsLoading(false);
+          if (isMounted) {
+            setIsLoading(false);
+          }
           return;
         }
 
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const sessionPromise = supabase.auth.getSession();
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
+        
+        clearTimeout(timeoutId);
         
         if (error) {
           console.error('Erro ao obter sessão:', error);
@@ -70,11 +106,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (session?.user && isMounted) {
           await loadUserProfile(session.user.id);
+        } else if (isMounted) {
+          // Se não há sessão ativa, limpar dados locais
+          localStorage.removeItem('maiacred_user');
+          setUser(null);
         }
-      } catch (error) {
+      } catch (error: any) {
+        clearTimeout(timeoutId);
         console.error('Erro ao verificar sessão:', error);
-        console.warn('Continuando em modo offline...');
-        setError(null); // Não mostrar erro se for problema de configuração
+        
+        if (error.message === 'Timeout na verificação de sessão') {
+          console.warn('⚠️ Timeout na verificação de autenticação. Continuando em modo offline...');
+          setError('Problemas de conectividade. Tente recarregar a página.');
+        } else {
+          console.warn('Continuando em modo offline...');
+          setError(null); // Não mostrar erro se for problema de configuração
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -110,6 +157,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (subscription?.unsubscribe) {
         subscription.unsubscribe();
       }
@@ -120,11 +170,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Carregando perfil do usuário:', userId);
       
-      const { data: profile, error } = await supabase
+      // Timeout de 3 segundos para carregamento do perfil
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Timeout no carregamento do perfil'));
+        }, 3000);
+      });
+
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      const { data: profile, error } = await Promise.race([
+        profilePromise,
+        timeoutPromise
+      ]) as any;
 
       console.log('Perfil carregado:', { profile, error });
 
@@ -144,17 +206,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (profile) {
         console.log('Definindo usuário no estado:', profile);
-        setUser({
+        const userData = {
           id: profile.id,
           nome: profile.nome,
           email: profile.email,
           cargo: profile.cargo,
           avatar: profile.avatar_url || undefined
-        });
+        };
+        
+        setUser(userData);
+        
+        // Salvar no localStorage para acesso rápido
+        try {
+          localStorage.setItem('maiacred_user', JSON.stringify(userData));
+        } catch (error) {
+          console.warn('Erro ao salvar no localStorage:', error);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar perfil:', error);
-      setError('Erro ao carregar perfil do usuário');
+      
+      if (error.message === 'Timeout no carregamento do perfil') {
+        setError('Timeout ao carregar perfil. Verifique sua conexão.');
+      } else {
+        setError('Erro ao carregar perfil do usuário');
+      }
     }
   };
 
@@ -291,6 +367,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       
       setUser(null);
+      
+      // Limpar localStorage
+      try {
+        localStorage.removeItem('maiacred_user');
+      } catch (error) {
+        console.warn('Erro ao limpar localStorage:', error);
+      }
     } catch (error) {
       console.error('Erro no logout:', error);
       setError('Erro inesperado durante o logout');

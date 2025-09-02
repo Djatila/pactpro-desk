@@ -46,11 +46,42 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true
+      },
+      global: {
+        headers: {
+          'x-application-name': 'maiacred-app'
+        }
+      },
+      db: {
+        schema: 'public'
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
       }
     });
-    console.log('✓ Supabase configurado com sucesso');
+    
+    // Teste básico de conectividade com timeout
+    const connectivityTest = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout na conexão com Supabase'));
+      }, 3000);
+      
+      supabase.auth.getSession().then(() => {
+        clearTimeout(timeout);
+        resolve(true);
+      }).catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+    
+    await connectivityTest;
+    console.log('✓ Supabase configurado e conectado com sucesso');
   } catch (error) {
-    console.error('Erro ao configurar Supabase:', error);
+    console.error('Erro ao configurar/conectar Supabase:', error);
+    console.warn('⚠️ Usando modo offline devido a problemas de conectividade');
     supabase = createMockClient();
   }
 }
