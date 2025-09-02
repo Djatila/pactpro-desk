@@ -13,7 +13,10 @@ export function SupabaseConfigAlert({ error, onDismiss }: SupabaseConfigAlertPro
                        error?.includes('Feature is disabled') ||
                        error?.includes('desabilitada no Supabase');
 
-  if (!isConfigError) {
+  const isUserExistsError = error?.includes('já está cadastrado') ||
+                           error?.includes('User already registered');
+
+  if (!isConfigError && !isUserExistsError) {
     return null;
   }
 
@@ -21,9 +24,75 @@ export function SupabaseConfigAlert({ error, onDismiss }: SupabaseConfigAlertPro
     window.open('https://supabase.com/dashboard/project/emvnudlonqoyfptrdwtd/settings/auth', '_blank');
   };
 
+  const openUserManagement = () => {
+    window.open('https://supabase.com/dashboard/project/emvnudlonqoyfptrdwtd/auth/users', '_blank');
+  };
+
+  const openLogin = () => {
+    window.location.href = '/login';
+  };
+
   const openInstructions = () => {
     window.open('/FIX_SUPABASE_CONFIG.md', '_blank');
   };
+
+  // Alerta para usuário já existente
+  if (isUserExistsError) {
+    return (
+      <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle className="text-yellow-800 font-semibold">
+          ⚠️ Usuário Já Existe
+        </AlertTitle>
+        <AlertDescription className="text-yellow-700 mt-2">
+          <p className="mb-3">
+            Este email já está <strong>cadastrado</strong> no sistema.
+            Escolha uma das opções abaixo:
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            <Button 
+              onClick={openLogin}
+              size="sm"
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            >
+              Fazer Login
+            </Button>
+            
+            <Button 
+              onClick={openUserManagement}
+              size="sm"
+              variant="outline"
+              className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Gerenciar Usuários
+            </Button>
+            
+            {onDismiss && (
+              <Button 
+                onClick={onDismiss}
+                size="sm"
+                variant="ghost"
+                className="text-yellow-600 hover:bg-yellow-100"
+              >
+                Dispensar
+              </Button>
+            )}
+          </div>
+
+          <div className="mt-4 p-3 bg-yellow-100 rounded-md text-sm">
+            <p className="font-medium mb-2">📋 Opções:</p>
+            <ol className="list-decimal list-inside space-y-1 text-xs">
+              <li>Faça login com este email</li>
+              <li>Use um email diferente para registrar</li>
+              <li>Delete o usuário no Supabase (link acima)</li>
+            </ol>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <Alert className="border-red-200 bg-red-50 text-red-800 mb-4">

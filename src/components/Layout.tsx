@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AccountSettingsModal } from "@/components/modals/AccountSettingsModal";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { ConnectivityStatus } from "@/components/ConnectivityStatus";
 import { User, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -92,6 +93,9 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Main Content */}
           <main className="flex-1 p-6 bg-accent/20">
+            {/* Status de Conectividade */}
+            <ConnectivityStatus />
+            
             {children}
           </main>
         </div>

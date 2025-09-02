@@ -57,25 +57,37 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
       },
       realtime: {
         params: {
-          eventsPerSecond: 10
+          eventsPerSecond: 5 // Reduzir para conexões mais lentas
         }
       }
     });
     
-    // Teste básico de conectividade com timeout (sem await no top-level)
+    // Teste básico de conectividade com timeout melhorado
     const testConnectivity = () => {
       const connectivityTest = new Promise((resolve, reject) => {
+        // Aumentar timeout para PCs com conectividade mais lenta
         const timeout = setTimeout(() => {
           reject(new Error('Timeout na conexão com Supabase'));
-        }, 3000);
+        }, 8000); // Aumentado de 3s para 8s
         
-        supabase.auth.getSession().then(() => {
-          clearTimeout(timeout);
-          resolve(true);
-        }).catch((error) => {
-          clearTimeout(timeout);
-          reject(error);
-        });
+        // Fazer múltiplas tentativas
+        const attemptConnection = async (retries = 2) => {
+          try {
+            await supabase.auth.getSession();
+            clearTimeout(timeout);
+            resolve(true);
+          } catch (error) {
+            if (retries > 0) {
+              console.warn(`Tentativa de conexão falhou, tentando novamente... (${retries} restantes)`);
+              setTimeout(() => attemptConnection(retries - 1), 1000);
+            } else {
+              clearTimeout(timeout);
+              reject(error);
+            }
+          }
+        };
+        
+        attemptConnection();
       });
       
       connectivityTest
@@ -96,7 +108,12 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
             console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
             console.error('   6. Site URL: http://localhost:8080');
           } else if (error.message?.includes('Timeout')) {
-            console.warn('⚠️ Problema de conectividade com Supabase:', error.message);
+            console.warn('⚠️ Problema de conectividade com Supabase - PC pode ter conexão mais lenta');
+            console.warn('💡 Sugestões:');
+            console.warn('   1. Verifique sua conexão com a internet');
+            console.warn('   2. Tente recarregar a página (Ctrl+F5)');
+            console.warn('   3. Use uma rede com melhor conectividade');
+            console.warn('   4. Aplicação funcionará em modo offline se necessário');
           }
         });
     };

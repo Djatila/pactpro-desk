@@ -55,11 +55,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const getSession = async () => {
       try {
-        // Timeout de 5 segundos para verificação de sessão
+        // Timeout aumentado para PCs com conectividade mais lenta (10 segundos)
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error('Timeout na verificação de sessão'));
-          }, 5000);
+          }, 10000); // Aumentado de 5s para 10s
         });
 
         // Verificação inicial rápida - tentar localStorage primeiro
@@ -116,8 +116,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('Erro ao verificar sessão:', error);
         
         if (error.message === 'Timeout na verificação de sessão') {
-          console.warn('⚠️ Timeout na verificação de autenticação. Continuando em modo offline...');
-          setError('Problemas de conectividade. Tente recarregar a página.');
+          console.warn('⚠️ Timeout na verificação de autenticação.');
+          console.warn('💻 PC detectado com conectividade mais lenta que celular');
+          console.warn('💡 Sugestões:');
+          console.warn('   1. Verifique sua conexão Wi-Fi/Ethernet');
+          console.warn('   2. Tente recarregar a página (Ctrl+F5)');
+          console.warn('   3. Feche outras abas que possam estar consumindo banda');
+          console.warn('   4. A aplicação continuará funcionando em modo offline');
+          
+          // Não definir erro para não bloquear a interface
+          setError(null);
+          
+          // Tentar carregar dados do localStorage como fallback
+          try {
+            const storedUser = localStorage.getItem('maiacred_user');
+            if (storedUser && isMounted) {
+              const parsedUser = JSON.parse(storedUser);
+              console.log('📋 Usando dados salvos localmente como fallback');
+              setUser(parsedUser);
+            }
+          } catch (storageError) {
+            console.warn('Erro ao carregar fallback do localStorage:', storageError);
+          }
         } else {
           console.warn('Continuando em modo offline...');
           setError(null); // Não mostrar erro se for problema de configuração
@@ -170,11 +190,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Carregando perfil do usuário:', userId);
       
-      // Timeout de 8 segundos para carregamento do perfil
+      // Timeout aumentado para carregamento do perfil (15 segundos)
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Timeout no carregamento do perfil'));
-        }, 8000);
+        }, 15000); // Aumentado de 8s para 15s
       });
 
       const profilePromise = supabase
@@ -317,6 +337,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
           console.error('   6. Site URL: http://localhost:8080');
           setError('CONFIGURAÇÃO NECESSÁRIA: A autenticação por email está desabilitada no Supabase. Verifique o console (F12) para instruções detalhadas.');
+        } else if (authError.message?.includes('User already registered')) {
+          console.warn('⚠️ Usuário já existe no sistema');
+          console.log('📋 OPÇÕES:');
+          console.log('   1. Faça LOGIN com este email na tela de login');
+          console.log('   2. Use um EMAIL DIFERENTE para registro');
+          console.log('   3. Delete o usuário no Supabase Dashboard > Authentication > Users');
+          setError('Este email já está cadastrado. Tente fazer login ou use um email diferente.');
         } else {
           setError(authError.message);
         }
