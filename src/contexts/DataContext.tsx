@@ -293,6 +293,13 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const updateMetrics = (contratos: Contrato[]) => {
     console.log('📊 Atualizando métricas dos bancos e clientes...');
+    console.log('🔍 Total de contratos recebidos:', contratos.length);
+    console.log('🔍 Contratos:', contratos.map(c => ({
+      id: c.id,
+      bancoId: c.bancoId,
+      bancoNome: c.bancoNome,
+      valorTotal: c.valorTotal
+    })));
     
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
@@ -316,14 +323,28 @@ export function DataProvider({ children }: DataProviderProps) {
 
     // Atualizar métricas dos bancos apenas se houver mudança
     setBancos(prev => {
+      console.log('🏦 Bancos atuais:', prev.map(b => ({ id: b.id, nome: b.nome, volumeAtual: b.volumeTotal })));
+      
       const updatedBancos = prev.map(banco => {
         const contratosBank = contratos.filter(c => c.bancoId === banco.id);
+        console.log(`🔍 Banco ${banco.nome} (${banco.id}):`);
+        console.log('  - Contratos encontrados:', contratosBank.length);
+        console.log('  - Valores dos contratos:', contratosBank.map(c => c.valorTotal));
+        
         const newContratosCount = contratosBank.length;
-        const newVolumeTotal = contratosBank.reduce((sum, c) => sum + c.valorTotal, 0);
+        const newVolumeTotal = contratosBank.reduce((sum, c) => {
+          console.log(`    Somando: ${sum} + ${c.valorTotal} = ${sum + c.valorTotal}`);
+          return sum + c.valorTotal;
+        }, 0);
+        
+        console.log(`  - Volume total calculado: ${newVolumeTotal}`);
+        
         const newVolumeTotalFormatted = newVolumeTotal.toLocaleString('pt-BR', {
           style: 'currency',
           currency: 'BRL'
         });
+        
+        console.log(`  - Volume formatado: ${newVolumeTotalFormatted}`);
         
         // Determinar status automaticamente baseado na existência de contratos
         const newStatus: 'ativo' | 'inativo' = newContratosCount > 0 ? 'ativo' : 'inativo';
@@ -332,6 +353,7 @@ export function DataProvider({ children }: DataProviderProps) {
         if (banco.contratos !== newContratosCount || 
             banco.volumeTotal !== newVolumeTotalFormatted ||
             banco.status !== newStatus) {
+          console.log(`  - Atualizando banco ${banco.nome}: contratos ${banco.contratos} -> ${newContratosCount}, volume ${banco.volumeTotal} -> ${newVolumeTotalFormatted}`);
           return {
             ...banco,
             contratos: newContratosCount,
@@ -339,11 +361,13 @@ export function DataProvider({ children }: DataProviderProps) {
             status: newStatus
           };
         }
+        console.log(`  - Banco ${banco.nome} não mudou`);
         return banco; // Manter referência se não mudou
       });
       
       // Só atualizar se algo realmente mudou
       const hasChanges = updatedBancos.some((banco, index) => banco !== prev[index]);
+      console.log('🔄 Bancos foram alterados?', hasChanges);
       return hasChanges ? updatedBancos : prev;
     });
   };
