@@ -10,6 +10,7 @@ import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { TipoContratoManagerModal } from "@/components/modals/TipoContratoManagerModal";
 import { useData } from "@/contexts/DataContext";
 import { type ContratoFormData, getTipoContratoLabel } from "@/lib/validations";
+import { formatContratoNome } from "@/lib/utils";
 import { 
   Plus, 
   Search, 
@@ -107,7 +108,7 @@ export default function Contratos() {
 
   const handleDownloadContrato = (contrato: any) => {
     // Simular download de contrato
-    toast.info(`Download do contrato #${contrato.id.toString().padStart(4, '0')} iniciado...`);
+    toast.info(`Download do ${formatContratoNome(contratos, contrato)} iniciado...`);
     // Aqui você pode implementar a lógica real de download/geração de PDF
   };
 
@@ -304,7 +305,7 @@ export default function Contratos() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-primary-dark">
-                        Contrato #{contrato.id.toString().padStart(4, '0')}
+                        {formatContratoNome(contratos, contrato)}
                       </h3>
                       <div className="flex items-center gap-4 mt-1">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -450,6 +451,7 @@ export default function Contratos() {
           setViewingContrato(null);
         }}
         contrato={viewingContrato}
+        todosContratos={contratos}
       />
 
       {/* Modal de Confirmação de Exclusão */}
@@ -469,7 +471,7 @@ export default function Contratos() {
             ? "ATENÇÃO: Este contrato ainda está ATIVO! Excluir um contrato ativo pode afetar os cálculos de receita e métricas do sistema. Tem certeza que deseja continuar?"
             : "Tem certeza que deseja excluir este contrato? Esta ação não pode ser desfeita."
         }
-        itemName={deletingContrato ? `#${deletingContrato.id.toString().padStart(4, '0')} - ${deletingContrato.clienteNome}` : undefined}
+        itemName={deletingContrato ? `${formatContratoNome(contratos, deletingContrato)} - ${deletingContrato.clienteNome}` : undefined}
       />
 
       {/* Modal do Gerenciador de Tipos de Contrato */}

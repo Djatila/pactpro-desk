@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReceitaChart } from "@/components/charts/ReceitaChart";
 import { MetaAnualModal } from "@/components/modals/MetaAnualModal";
 import { useData } from "@/contexts/DataContext";
+import { formatContratoNumero } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
   Calendar,
@@ -137,6 +138,7 @@ export default function Relatorios() {
       
       return {
         id: parseInt(contrato.id),
+        contratoOriginal: contrato, // Adicionar contrato original para gerar nomenclatura
         cliente: contrato.clienteNome,
         banco: contrato.bancoNome,
         valor: contrato.valorTotal,
@@ -496,7 +498,7 @@ export default function Relatorios() {
                         <tbody>
                           {dadosRelatorio.contratosDetalhados.map((contrato) => (
                             <tr key={contrato.id} className="border-b hover:bg-accent/50">
-                              <td className="p-3 text-sm font-medium">#{contrato.id.toString().padStart(4, '0')}</td>
+                              <td className="p-3 text-sm font-medium">{formatContratoNumero(contratos, contrato.contratoOriginal)}</td>
                               <td className="p-3 text-sm">{contrato.cliente}</td>
                               <td className="p-3 text-sm">{contrato.banco}</td>
                               <td className="p-3 text-sm text-muted-foreground">{contrato.data}</td>

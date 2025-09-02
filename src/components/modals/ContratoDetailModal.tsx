@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getTipoContratoLabel } from "@/lib/validations";
+import { formatContratoNome } from "@/lib/utils";
 import { 
   FileText, 
   User, 
@@ -36,9 +37,10 @@ interface ContratoDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   contrato: Contrato | null;
+  todosContratos: Contrato[]; // Adicionar todos os contratos para gerar nomenclatura
 }
 
-export function ContratoDetailModal({ isOpen, onClose, contrato }: ContratoDetailModalProps) {
+export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos }: ContratoDetailModalProps) {
   if (!contrato) return null;
 
   const getStatusColor = (status: string) => {
@@ -77,7 +79,7 @@ export function ContratoDetailModal({ isOpen, onClose, contrato }: ContratoDetai
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-bold text-primary-dark">
-                Contrato #{contrato.id.toString().padStart(4, '0')}
+                {formatContratoNome(todosContratos, contrato)}
               </h2>
               <p className="text-sm text-muted-foreground">ID: {contrato.id}</p>
             </div>
