@@ -43,6 +43,40 @@ interface ContratoDetailModalProps {
 export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos }: ContratoDetailModalProps) {
   if (!contrato) return null;
 
+  // Função para calcular data de término do contrato
+  const calculateEndDate = (startDate: string, numParcelas: number): string => {
+    if (!startDate || !numParcelas || numParcelas <= 0) return '';
+    
+    try {
+      // Converter data DD/MM/AAAA para objeto Date
+      const dateParts = startDate.split('/');
+      if (dateParts.length !== 3) return '';
+      
+      const day = parseInt(dateParts[0]);
+      const month = parseInt(dateParts[1]) - 1; // JavaScript usa meses 0-11
+      const year = parseInt(dateParts[2]);
+      
+      if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
+      
+      const startDateObj = new Date(year, month, day);
+      
+      // Adicionar número de meses (parcelas são mensais)
+      const endDateObj = new Date(startDateObj);
+      endDateObj.setMonth(endDateObj.getMonth() + numParcelas);
+      
+      // Formatar de volta para DD/MM/AAAA
+      const endDay = endDateObj.getDate().toString().padStart(2, '0');
+      const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const endYear = endDateObj.getFullYear();
+      
+      return `${endDay}/${endMonth}/${endYear}`;
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const dataTermino = calculateEndDate(contrato.dataEmprestimo, contrato.parcelas);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ativo": return "bg-success text-success-foreground";
@@ -208,17 +242,33 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-primary-dark">Detalhes do Contrato</h3>
             
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Data do Empréstimo</p>
-                    <p className="font-medium">{contrato.dataEmprestimo}</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data do Empréstimo</p>
+                      <p className="font-medium">{contrato.dataEmprestimo}</p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {dataTermino && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-5 w-5 text-success" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Data Final</p>
+                        <p className="font-medium text-success">{dataTermino}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
             {contrato.observacoes && (
               <Card>
