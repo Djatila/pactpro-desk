@@ -83,7 +83,21 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
           console.log('✓ Supabase configurado e conectado com sucesso');
         })
         .catch((error) => {
-          console.warn('⚠️ Problema de conectividade com Supabase:', error.message);
+          console.error('❌ ERRO CRÍTICO - Supabase:', error.message);
+          
+          // Detectar erros específicos e dar orientações
+          if (error.message?.includes('disabled')) {
+            console.error('🚨 SOLUÇÃO URGENTE: Autenticação por email está DESABILITADA no Supabase');
+            console.error('📋 PASSOS:');
+            console.error('   1. Acesse: https://supabase.com/dashboard');
+            console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
+            console.error('   3. Authentication → Settings');
+            console.error('   4. HABILITE: "Enable email provider"');
+            console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
+            console.error('   6. Site URL: http://localhost:8080');
+          } else if (error.message?.includes('Timeout')) {
+            console.warn('⚠️ Problema de conectividade com Supabase:', error.message);
+          }
         });
     };
     

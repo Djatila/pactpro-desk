@@ -305,7 +305,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (authError) {
         console.error('Erro de autenticação:', authError);
-        setError(authError.message);
+        
+        // Detectar se a feature está desabilitada
+        if (authError.message?.includes('disabled') || authError.message?.includes('Email logins')) {
+          console.error('🚨 ERRO CRÍTICO: Autenticação por email está DESABILITADA no Supabase!');
+          console.error('📋 SOLUÇÃO URGENTE:');
+          console.error('   1. Acesse: https://supabase.com/dashboard');
+          console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
+          console.error('   3. Authentication → Settings');
+          console.error('   4. HABILITE: "Enable email provider"');
+          console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
+          console.error('   6. Site URL: http://localhost:8080');
+          setError('CONFIGURAÇÃO NECESSÁRIA: A autenticação por email está desabilitada no Supabase. Verifique o console (F12) para instruções detalhadas.');
+        } else {
+          setError(authError.message);
+        }
         setIsLoading(false);
         return false;
       }
@@ -380,7 +394,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
             errorMessage = 'Usuário não encontrado';
             break;
           default:
-            errorMessage = `Erro de login: ${authError.message}`;
+            // Detectar se a feature está desabilitada
+            if (authError.message?.includes('disabled') || authError.message?.includes('Email logins')) {
+              console.error('🚨 ERRO CRÍTICO: Autenticação por email está DESABILITADA no Supabase!');
+              console.error('📋 SOLUÇÃO URGENTE:');
+              console.error('   1. Acesse: https://supabase.com/dashboard');
+              console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
+              console.error('   3. Authentication → Settings');
+              console.error('   4. HABILITE: "Enable email provider"');
+              console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
+              console.error('   6. Site URL: http://localhost:8080');
+              errorMessage = 'CONFIGURAÇÃO NECESSÁRIA: A autenticação por email está desabilitada no Supabase. Verifique o console (F12) para instruções detalhadas.';
+            } else {
+              errorMessage = `Erro de login: ${authError.message}`;
+            }
         }
         
         setError(errorMessage);

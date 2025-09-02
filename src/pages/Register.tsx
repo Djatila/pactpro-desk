@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SupabaseConfigAlert } from '../components/SupabaseConfigAlert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreditCard, Eye, EyeOff, Loader2, UserPlus, ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -101,8 +102,14 @@ export default function Register() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Alerta de configuração crítica */}
+            <SupabaseConfigAlert 
+              error={error} 
+              onDismiss={() => setError('')}
+            />
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {error && (
+              {error && !error?.includes('CONFIGURAÇÃO NECESSÁRIA') && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>

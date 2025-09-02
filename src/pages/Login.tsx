@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SupabaseConfigAlert } from '../components/SupabaseConfigAlert';
 import { CreditCard, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -75,8 +76,14 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Alerta de configuração crítica */}
+            <SupabaseConfigAlert 
+              error={error || authError || ''} 
+              onDismiss={() => setError('')}
+            />
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {(error || authError) && (
+              {(error || authError) && !error?.includes('CONFIGURAÇÃO NECESSÁRIA') && (
                 <Alert variant="destructive">
                   <AlertDescription>{error || authError}</AlertDescription>
                 </Alert>

@@ -99,6 +99,28 @@ export function DataProvider({ children }: DataProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Função utilitária para detectar erros de configuração
+  const handleSupabaseError = (error: any, operation: string) => {
+    console.error(`Erro ao ${operation}:`, error);
+    
+    if (error?.message?.includes('disabled') || error?.message?.includes('Feature is disabled')) {
+      console.error('🚨 ERRO CRÍTICO: Função desabilitada no Supabase!');
+      console.error('📋 SOLUÇÃO URGENTE:');
+      console.error('   1. Acesse: https://supabase.com/dashboard');
+      console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
+      console.error('   3. Authentication → Settings');
+      console.error('   4. HABILITE: "Enable email provider"');
+      console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
+      console.error('   6. Site URL: http://localhost:8080');
+      setError('CONFIGURAÇÃO NECESSÁRIA: Funcionalidade desabilitada no Supabase. Verifique o console (F12) para instruções.');
+    } else if (error?.message?.includes('timeout') || error?.message?.includes('Timeout')) {
+      console.warn('⚠️ Timeout na operação:', operation);
+      setError('Problemas de conectividade. Tente novamente.');
+    } else {
+      setError(`Erro ao ${operation}`);
+    }
+  };
+
   // Carregar dados quando o usuário estiver autenticado
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -318,8 +340,7 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadClientes();
       return true;
     } catch (error) {
-      console.error('Erro ao adicionar cliente:', error);
-      setError('Erro ao adicionar cliente');
+      handleSupabaseError(error, 'adicionar cliente');
       return false;
     } finally {
       setIsLoading(false);
@@ -353,8 +374,7 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadClientes();
       return true;
     } catch (error) {
-      console.error('Erro ao atualizar cliente:', error);
-      setError('Erro ao atualizar cliente');
+      handleSupabaseError(error, 'atualizar cliente');
       return false;
     } finally {
       setIsLoading(false);
@@ -379,8 +399,7 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadContratos(); // Recarregar contratos pois podem ter sido afetados
       return true;
     } catch (error) {
-      console.error('Erro ao deletar cliente:', error);
-      setError('Erro ao deletar cliente');
+      handleSupabaseError(error, 'deletar cliente');
       return false;
     } finally {
       setIsLoading(false);
@@ -414,8 +433,7 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadBancos();
       return true;
     } catch (error) {
-      console.error('Erro ao adicionar banco:', error);
-      setError('Erro ao adicionar banco');
+      handleSupabaseError(error, 'adicionar banco');
       return false;
     } finally {
       setIsLoading(false);
