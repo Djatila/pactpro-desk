@@ -112,7 +112,18 @@ export default function Bancos() {
       banco.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       banco.codigo.includes(searchTerm)
     )
-    .sort((a, b) => b.contratos - a.contratos); // Ordenar por número de contratos (maior para menor)
+    .sort((a, b) => {
+      // Ordenação estável: primeiro por número de contratos (maior para menor)
+      const contratosDiff = b.contratos - a.contratos;
+      if (contratosDiff !== 0) return contratosDiff;
+      
+      // Se o número de contratos for igual, ordenar por nome (A-Z)
+      const nomeComparison = a.nome.localeCompare(b.nome);
+      if (nomeComparison !== 0) return nomeComparison;
+      
+      // Se nome também for igual, ordenar por ID para garantir ordem consistente
+      return a.id.localeCompare(b.id);
+    });
 
   const bancosAtivos = bancos.filter(b => b.status === 'ativo');
   // Calcular métricas baseadas nos contratos reais
@@ -217,8 +228,8 @@ export default function Bancos() {
 
       {/* Banks Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredBancos.map((banco) => (
-          <Card key={banco.id} className="shadow-card hover:shadow-card-hover transition-all">
+        {filteredBancos.map((banco, index) => (
+          <Card key={`banco-${banco.id}-${index}`} className="shadow-card hover:shadow-card-hover transition-all">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">

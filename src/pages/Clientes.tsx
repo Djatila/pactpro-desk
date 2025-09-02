@@ -97,12 +97,25 @@ export default function Clientes() {
     setDeletingCliente(null);
   };
 
-  // Mock data - será substituído por dados reais
-  const filteredClientes = clientes.filter(cliente =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.cpf.includes(searchTerm) ||
-    cliente.telefone.includes(searchTerm)
-  );
+  // Filtro e ordenação estável para clientes
+  const filteredClientes = clientes
+    .filter(cliente =>
+      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.cpf.includes(searchTerm) ||
+      cliente.telefone.includes(searchTerm)
+    )
+    .sort((a, b) => {
+      // Ordenação estável: primeiro por número de contratos (maior para menor)
+      const contratosDiff = b.contratos - a.contratos;
+      if (contratosDiff !== 0) return contratosDiff;
+      
+      // Se o número de contratos for igual, ordenar por nome (A-Z)
+      const nomeComparison = a.nome.localeCompare(b.nome);
+      if (nomeComparison !== 0) return nomeComparison;
+      
+      // Se nome também for igual, ordenar por ID para garantir ordem consistente
+      return a.id.localeCompare(b.id);
+    });
 
   return (
     <div className="space-y-6">
@@ -193,8 +206,8 @@ export default function Clientes() {
 
       {/* Clients List */}
       <div className="grid gap-4">
-        {filteredClientes.map((cliente) => (
-          <Card key={cliente.id} className="shadow-card hover:shadow-card-hover transition-all">
+        {filteredClientes.map((cliente, index) => (
+          <Card key={`cliente-${cliente.id}-${index}`} className="shadow-card hover:shadow-card-hover transition-all">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex-1 space-y-3">

@@ -198,130 +198,119 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Carregando perfil do usuário:', userId);
       
-      // Timeout otimizado para carregamento do perfil (8 segundos)
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Timeout no carregamento do perfil'));
-        }, 8000); // Reduzido de 15s para 8s
-      });
-
-      const profilePromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      const { data: profile, error } = await Promise.race([
-        profilePromise,
-        timeoutPromise
-      ]) as any;
-
-      console.log('Perfil carregado:', { profile, error });
-
-      if (error) {
-        console.error('Erro ao carregar perfil:', error);
-        
-        // Se o perfil não existir ou houver problemas, criar um perfil básico
-        if (error.code === 'PGRST116' || error.message?.includes('Timeout')) {
-          if (error.message?.includes('Timeout')) {
-            console.warn('⚠️ Timeout no carregamento do perfil - criando perfil básico');
-          } else {
-            console.warn('Perfil não encontrado - criando perfil básico');
-          }
-          
-          // Tentar obter dados do usuário autenticado com timeout menor
-          try {
-            const getUserPromise = supabase.auth.getUser();
-            const timeoutUserPromise = new Promise((_, reject) => {
-              setTimeout(() => {
-                reject(new Error('Timeout ao obter dados do usuário'));
-              }, 3000); // Timeout de 3s para getUser
-            });
-            
-            const { data: { user } } = await Promise.race([
-              getUserPromise,
-              timeoutUserPromise
-            ]) as any;
-            
-            if (user) {
-              const basicUserData = {
-                id: user.id,
-                nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
-                email: user.email || '',
-                cargo: user.user_metadata?.cargo || 'Usuário',
-                avatar: user.user_metadata?.avatar || undefined
-              };
-              
-              console.log('Usando perfil básico:', basicUserData);
-              setUser(basicUserData);
-              
-              // Salvar no localStorage
-              try {
-                localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
-              } catch (error) {
-                console.warn('Erro ao salvar no localStorage:', error);
-              }
-              
-              return;
-            }
-          } catch (userError) {
-            console.warn('Erro ou timeout ao obter dados do usuário:', userError);
-          }
-        }
-        
-        // Se não conseguir criar perfil básico, mostrar erro mas não bloquear
-        console.warn('Não foi possível carregar perfil, continuando sem dados de perfil');
-        setError(null); // Não mostrar erro que impeça o uso
-        return;
-      }
-
-      if (profile) {
-        console.log('Definindo usuário no estado:', profile);
-        const userData = {
-          id: profile.id,
-          nome: profile.nome,
-          email: profile.email,
-          cargo: profile.cargo,
-          avatar: profile.avatar_url || undefined
-        };
-        
-        setUser(userData);
-        
-        // Salvar no localStorage para acesso rápido
-        try {
-          localStorage.setItem('maiacred_user', JSON.stringify(userData));
-        } catch (error) {
-          console.warn('Erro ao salvar no localStorage:', error);
-        }
-      }
-    } catch (error: any) {
-      console.error('Erro ao carregar perfil:', error);
+      // Criar perfil básico IMEDIATAMENTE sem aguardar nenhuma chamada async
+      const basicUserData = {
+        id: userId,
+        nome: 'Usuário',
+        email: '',
+        cargo: 'Usuário',
+        avatar: undefined
+      };
       
-      // Em qualquer erro, tentar criar um perfil básico para não bloquear o usuário
+      console.log('✅ Definindo usuário IMEDIATAMENTE:', basicUserData);
+      setUser(basicUserData);
+      
+      // Salvar no localStorage
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          const fallbackUserData = {
-            id: user.id,
-            nome: user.email?.split('@')[0] || 'Usuário',
-            email: user.email || '',
-            cargo: 'Usuário',
-            avatar: undefined
-          };
+        localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
+        console.log('✅ Dados salvos no localStorage');
+      } catch (error) {
+        console.warn('Erro ao salvar no localStorage:', error);
+      }
+      
+      // Tentar melhorar os dados em background SEM bloquear
+      setTimeout(async () => {
+        try {
+          console.log('🔄 Tentando carregar dados do usuário em background...');
           
-          console.log('Usando perfil fallback:', fallbackUserData);
-          setUser(fallbackUserData);
+          // Timeout muito agressivo para getUser
+          const getUserPromise = supabase.auth.getUser();
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Timeout getUser'));
+            }, 2000); // 2 segundos
+          });
           
-          try {
-            localStorage.setItem('maiacred_user', JSON.stringify(fallbackUserData));
-          } catch (storageError) {
-            console.warn('Erro ao salvar fallback no localStorage:', storageError);
+          const { data: { user } } = await Promise.race([
+            getUserPromise,
+            timeoutPromise
+          ]) as any;
+          
+          if (user && user.email) {
+            const improvedUserData = {
+              id: user.id,
+              nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
+              email: user.email,
+              cargo: user.user_metadata?.cargo || 'Usuário',
+              avatar: user.user_metadata?.avatar || undefined
+            };
+            
+            console.log('✅ Dados melhorados obtidos:', improvedUserData);
+            setUser(improvedUserData);
+            localStorage.setItem('maiacred_user', JSON.stringify(improvedUserData));
           }
+        } catch (userError) {
+          console.log('⚠️ Não foi possível melhorar dados do usuário:', userError);
         }
-      } catch (fallbackError) {
-        console.error('Erro ao criar perfil fallback:', fallbackError);
-        setError('Problemas de conectividade. Algumas funcionalidades podem estar limitadas.');
+        
+        // Tentar carregar perfil da tabela profiles
+        try {
+          console.log('🔄 Tentando carregar perfil da tabela...');
+          
+          const profilePromise = supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Timeout profile'));
+            }, 2000); // 2 segundos
+          });
+
+          const { data: profile, error } = await Promise.race([
+            profilePromise,
+            timeoutPromise
+          ]) as any;
+
+          if (!error && profile) {
+            const completeUserData = {
+              id: profile.id,
+              nome: profile.nome,
+              email: profile.email,
+              cargo: profile.cargo,
+              avatar: profile.avatar_url || undefined
+            };
+            
+            console.log('✅ Perfil completo carregado:', completeUserData);
+            setUser(completeUserData);
+            localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
+          }
+        } catch (profileError) {
+          console.log('⚠️ Perfil da tabela não disponível:', profileError);
+        }
+      }, 100); // Executar após 100ms
+      
+    } catch (error: any) {
+      console.error('Erro crítico ao carregar perfil:', error);
+      
+      // Mesmo com erro, garantir que o usuário seja definido
+      const emergencyUserData = {
+        id: userId,
+        nome: 'Usuário',
+        email: '',
+        cargo: 'Usuário',
+        avatar: undefined
+      };
+      
+      console.log('🚨 Usando dados de emergência:', emergencyUserData);
+      setUser(emergencyUserData);
+      
+      try {
+        localStorage.setItem('maiacred_user', JSON.stringify(emergencyUserData));
+      } catch (storageError) {
+        console.warn('Erro ao salvar dados de emergência:', storageError);
       }
     }
   };
@@ -469,15 +458,71 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (authData.user) {
-        console.log('Login bem-sucedido. Carregando perfil...');
+        console.log('Login bem-sucedido. Criando usuário com dados do login...');
+        
+        // Criar usuário IMEDIATAMENTE com dados do login
+        const loginUserData = {
+          id: authData.user.id,
+          nome: authData.user.user_metadata?.nome || authData.user.email?.split('@')[0] || 'Usuário',
+          email: authData.user.email || email,
+          cargo: authData.user.user_metadata?.cargo || 'Usuário',
+          avatar: authData.user.user_metadata?.avatar || undefined
+        };
+        
+        console.log('✅ Definindo usuário com dados do login:', loginUserData);
+        setUser(loginUserData);
+        
+        // Salvar no localStorage
         try {
-          await loadUserProfile(authData.user.id);
-        } catch (profileError) {
-          console.error('Erro no carregamento do perfil, mas login foi bem-sucedido:', profileError);
-          // Não bloquear o login se houver erro no perfil
-        } finally {
-          setIsLoading(false);
+          localStorage.setItem('maiacred_user', JSON.stringify(loginUserData));
+          console.log('✅ Dados do login salvos no localStorage');
+        } catch (error) {
+          console.warn('Erro ao salvar dados do login no localStorage:', error);
         }
+        
+        // Tentar melhorar dados em background (sem bloquear)
+        setTimeout(async () => {
+          try {
+            console.log('🔄 Tentando carregar perfil completo da tabela em background...');
+            
+            const profilePromise = supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authData.user.id)
+              .single();
+              
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Timeout profile background'));
+              }, 3000); // 3 segundos para background
+            });
+
+            const { data: profile, error } = await Promise.race([
+              profilePromise,
+              timeoutPromise
+            ]) as any;
+
+            if (!error && profile) {
+              const completeUserData = {
+                id: profile.id,
+                nome: profile.nome || loginUserData.nome,
+                email: profile.email || loginUserData.email,
+                cargo: profile.cargo || loginUserData.cargo,
+                avatar: profile.avatar_url || undefined
+              };
+              
+              console.log('✅ Perfil completo carregado em background:', completeUserData);
+              setUser(completeUserData);
+              localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
+            } else {
+              console.log('⚠️ Perfil da tabela não disponível, mantendo dados do login');
+            }
+          } catch (profileError) {
+            console.log('⚠️ Erro no carregamento do perfil em background, mantendo dados do login:', profileError);
+          }
+        }, 200); // Executar após 200ms
+        
+        setIsLoading(false);
         return true;
       }
       

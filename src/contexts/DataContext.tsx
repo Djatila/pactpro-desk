@@ -123,16 +123,18 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Carregar dados quando o usuário estiver autenticado
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user?.id) {
+      console.log('🔄 DataContext: Carregando dados para usuário:', user.id);
       refreshData();
     } else {
+      console.log('🧙 DataContext: Limpando dados - usuário não autenticado');
       // Limpar dados quando não autenticado
       setClientes([]);
       setBancos([]);
       setContratos([]);
       setMetaAnual(180000);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]); // Usar user?.id em vez de user completo
 
   const refreshData = async () => {
     if (!user) return;
@@ -290,26 +292,52 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const updateMetrics = (contratos: Contrato[]) => {
-    // Atualizar métricas dos clientes
-    setClientes(prev => prev.map(cliente => ({
-      ...cliente,
-      contratos: contratos.filter(c => c.clienteId === cliente.id).length
-    })));
-
-    // Atualizar métricas dos bancos
-    setBancos(prev => prev.map(banco => {
-      const contratosBank = contratos.filter(c => c.bancoId === banco.id);
-      const volumeTotal = contratosBank.reduce((sum, c) => sum + c.valorTotal, 0);
+    // Atualizar métricas dos clientes apenas se houver mudança
+    setClientes(prev => {
+      const updatedClientes = prev.map(cliente => {
+        const clienteContratos = contratos.filter(c => c.clienteId === cliente.id).length;
+        
+        // Só retornar novo objeto se realmente mudou
+        if (cliente.contratos !== clienteContratos) {
+          return {
+            ...cliente,
+            contratos: clienteContratos
+          };
+        }
+        return cliente; // Manter referência se não mudou
+      });
       
-      return {
-        ...banco,
-        contratos: contratosBank.length,
-        volumeTotal: volumeTotal.toLocaleString('pt-BR', {
+      // Só atualizar se algo realmente mudou
+      const hasChanges = updatedClientes.some((cliente, index) => cliente !== prev[index]);
+      return hasChanges ? updatedClientes : prev;
+    });
+
+    // Atualizar métricas dos bancos apenas se houver mudança
+    setBancos(prev => {
+      const updatedBancos = prev.map(banco => {
+        const contratosBank = contratos.filter(c => c.bancoId === banco.id);
+        const newContratosCount = contratosBank.length;
+        const newVolumeTotal = contratosBank.reduce((sum, c) => sum + c.valorTotal, 0);
+        const newVolumeTotalFormatted = newVolumeTotal.toLocaleString('pt-BR', {
           style: 'currency',
           currency: 'BRL'
-        })
-      };
-    }));
+        });
+        
+        // Só retornar novo objeto se realmente mudou
+        if (banco.contratos !== newContratosCount || banco.volumeTotal !== newVolumeTotalFormatted) {
+          return {
+            ...banco,
+            contratos: newContratosCount,
+            volumeTotal: newVolumeTotalFormatted
+          };
+        }
+        return banco; // Manter referência se não mudou
+      });
+      
+      // Só atualizar se algo realmente mudou
+      const hasChanges = updatedBancos.some((banco, index) => banco !== prev[index]);
+      return hasChanges ? updatedBancos : prev;
+    });
   };
 
   // Funções para CRUD de clientes
