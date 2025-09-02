@@ -62,23 +62,35 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
       }
     });
     
-    // Teste básico de conectividade com timeout
-    const connectivityTest = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout na conexão com Supabase'));
-      }, 3000);
-      
-      supabase.auth.getSession().then(() => {
-        clearTimeout(timeout);
-        resolve(true);
-      }).catch((error) => {
-        clearTimeout(timeout);
-        reject(error);
+    // Teste básico de conectividade com timeout (sem await no top-level)
+    const testConnectivity = () => {
+      const connectivityTest = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout na conexão com Supabase'));
+        }, 3000);
+        
+        supabase.auth.getSession().then(() => {
+          clearTimeout(timeout);
+          resolve(true);
+        }).catch((error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
       });
-    });
+      
+      connectivityTest
+        .then(() => {
+          console.log('✓ Supabase configurado e conectado com sucesso');
+        })
+        .catch((error) => {
+          console.warn('⚠️ Problema de conectividade com Supabase:', error.message);
+        });
+    };
     
-    await connectivityTest;
-    console.log('✓ Supabase configurado e conectado com sucesso');
+    // Executar teste de conectividade de forma assíncrona
+    setTimeout(testConnectivity, 100);
+    
+    console.log('✓ Supabase cliente configurado');
   } catch (error) {
     console.error('Erro ao configurar/conectar Supabase:', error);
     console.warn('⚠️ Usando modo offline devido a problemas de conectividade');
