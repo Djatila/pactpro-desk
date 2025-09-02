@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthContext';
+import type {
+  Cliente as ClienteDB,
+  Banco as BancoDB,
+  Contrato as ContratoDB,
+  ClienteInsert,
+  BancoInsert,
+  ContratoInsert
+} from '@/lib/database.types';
 
+// Tipos para compatibilidade com a interface atual
 interface Cliente {
   id: string;
   nome: string;
@@ -48,18 +59,21 @@ interface DataContextType {
   bancos: Banco[];
   contratos: Contrato[];
   metaAnual: number;
-  addCliente: (cliente: Omit<Cliente, 'id' | 'contratos' | 'status'>) => void;
-  updateCliente: (id: string, cliente: Partial<Cliente>) => void;
-  deleteCliente: (id: string) => void;
-  addBanco: (banco: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>) => void;
-  updateBanco: (id: string, banco: Partial<Banco>) => void;
-  deleteBanco: (id: string) => void;
-  addContrato: (contrato: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>) => void;
-  updateContrato: (id: string, contrato: Partial<Contrato>) => void;
-  deleteContrato: (id: string) => void;
-  updateMetaAnual: (meta: number) => void;
+  isLoading: boolean;
+  error: string | null;
+  addCliente: (cliente: Omit<Cliente, 'id' | 'contratos' | 'status'>) => Promise<boolean>;
+  updateCliente: (id: string, cliente: Partial<Cliente>) => Promise<boolean>;
+  deleteCliente: (id: string) => Promise<boolean>;
+  addBanco: (banco: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>) => Promise<boolean>;
+  updateBanco: (id: string, banco: Partial<Banco>) => Promise<boolean>;
+  deleteBanco: (id: string) => Promise<boolean>;
+  addContrato: (contrato: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>) => Promise<boolean>;
+  updateContrato: (id: string, contrato: Partial<Contrato>) => Promise<boolean>;
+  deleteContrato: (id: string) => Promise<boolean>;
+  updateMetaAnual: (meta: number) => Promise<boolean>;
   getClienteById: (id: string) => Cliente | undefined;
   getBancoById: (id: string) => Banco | undefined;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -72,272 +86,526 @@ export function useData() {
   return context;
 }
 
-// Dados iniciais (mock)
-const initialClientes: Cliente[] = [
-  {
-    id: '1',
-    nome: 'Maria Silva Santos',
-    cpf: '123.456.789-09',
-    telefone: '(11) 99999-9999',
-    email: 'maria@email.com',
-    endereco: 'Rua das Flores, 123 - São Paulo/SP',
-    dataNascimento: '15/03/1985',
-    contratos: 0,
-    status: 'ativo'
-  },
-  {
-    id: '2',
-    nome: 'João Pedro Costa',
-    cpf: '987.654.321-00',
-    telefone: '(11) 88888-8888',
-    email: 'joao@email.com',
-    endereco: 'Av. Paulista, 456 - São Paulo/SP',
-    dataNascimento: '22/07/1990',
-    contratos: 0,
-    status: 'ativo'
-  },
-  {
-    id: '3',
-    nome: 'Ana Carolina Lima',
-    cpf: '456.789.123-00',
-    telefone: '(11) 77777-7777',
-    email: 'ana@email.com',
-    endereco: 'Rua Augusta, 789 - São Paulo/SP',
-    dataNascimento: '08/12/1987',
-    contratos: 0,
-    status: 'ativo'
-  }
-];
-
-const initialBancos: Banco[] = [
-  {
-    id: '1',
-    nome: 'Banco do Brasil',
-    codigo: '001',
-    taxaMedia: 2.5,
-    contato: 'João Silva',
-    telefoneContato: '(11) 99999-1111',
-    observacoes: 'Taxa média: 2,5% a.m. | Contato: João Silva - (11) 99999-1111',
-    contratos: 0,
-    volumeTotal: 'R$ 0',
-    status: 'ativo'
-  },
-  {
-    id: '2',
-    nome: 'Itaú Unibanco',
-    codigo: '341',
-    taxaMedia: 2.8,
-    contato: 'Maria Santos',
-    telefoneContato: '(11) 88888-2222',
-    observacoes: 'Taxa média: 2,8% a.m. | Aprovação rápida | Contato: Maria Santos',
-    contratos: 0,
-    volumeTotal: 'R$ 0',
-    status: 'ativo'
-  },
-  {
-    id: '3',
-    nome: 'Bradesco',
-    codigo: '237',
-    taxaMedia: 3.0,
-    contato: 'Pedro Oliveira',
-    telefoneContato: '(11) 77777-3333',
-    observacoes: 'Taxa média: 3,0% a.m. | Bom para aposentados',
-    contratos: 0,
-    volumeTotal: 'R$ 0',
-    status: 'ativo'
-  },
-  {
-    id: '4',
-    nome: 'Santander',
-    codigo: '033',
-    taxaMedia: 2.7,
-    contato: 'Pedro Lima',
-    telefoneContato: '(11) 66666-4444',
-    observacoes: 'Taxa média: 2,7% a.m. | Processo lento | Contato: Pedro Lima',
-    contratos: 0,
-    volumeTotal: 'R$ 0',
-    status: 'ativo'
-  },
-  {
-    id: '5',
-    nome: 'Caixa Econômica Federal',
-    codigo: '104',
-    taxaMedia: 2.2,
-    contato: 'Ana Costa',
-    telefoneContato: '(11) 55555-5555',
-    observacoes: 'Taxa média: 2,2% a.m. | Melhor para servidores públicos',
-    contratos: 0,
-    volumeTotal: 'R$ 0',
-    status: 'inativo'
-  }
-];
-
-// Sistema iniciará sem contratos - todos serão cadastrados pelo usuário
-const initialContratos: Contrato[] = [];
-
 interface DataProviderProps {
   children: React.ReactNode;
 }
 
 export function DataProvider({ children }: DataProviderProps) {
-  // Forçar limpeza completa dos dados - SEMPRE limpar ao carregar
+  const { user, isAuthenticated } = useAuth();
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [bancos, setBancos] = useState<Banco[]>([]);
+  const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [metaAnual, setMetaAnual] = useState<number>(180000);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Carregar dados quando o usuário estiver autenticado
   useEffect(() => {
-    // Limpa TODOS os dados do sistema para garantir início limpo
-    localStorage.removeItem('maiacred_clientes');
-    localStorage.removeItem('maiacred_bancos');
-    localStorage.removeItem('maiacred_contratos');
-    localStorage.removeItem('maiacred_meta_anual');
-    localStorage.removeItem('maiacred_cleared');
-    console.log('✅ Sistema limpo - todos os dados foram resetados');
-  }, []);
+    if (isAuthenticated && user) {
+      refreshData();
+    } else {
+      // Limpar dados quando não autenticado
+      setClientes([]);
+      setBancos([]);
+      setContratos([]);
+      setMetaAnual(180000);
+    }
+  }, [isAuthenticated, user]);
 
-  const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
-  const [bancos, setBancos] = useState<Banco[]>(initialBancos);
-  const [contratos, setContratos] = useState<Contrato[]>(initialContratos);
-  const [metaAnual, setMetaAnual] = useState<number>(180000); // Meta padrão de R$ 180.000 (R$ 15.000 x 12 meses)
+  const refreshData = async () => {
+    if (!user) return;
+    
+    // Verificar se o Supabase está configurado
+    if (!supabase || typeof supabase.from !== 'function') {
+      console.warn('⚠️ Supabase não configurado. Dados não serão sincronizados.');
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
 
-  // Função para atualizar métricas dos bancos baseado nos contratos reais
-  const updateBancoMetrics = () => {
+    try {
+      await Promise.all([
+        loadClientes(),
+        loadBancos(),
+        loadContratos(),
+        loadMetaAnual()
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('nome');
+
+      if (error) throw error;
+
+      const clientesFormatted: Cliente[] = (data || []).map(cliente => ({
+        id: cliente.id,
+        nome: cliente.nome,
+        cpf: cliente.cpf,
+        telefone: cliente.telefone,
+        email: cliente.email,
+        endereco: cliente.endereco,
+        dataNascimento: cliente.data_nascimento,
+        observacoes: cliente.observacoes,
+        status: cliente.status,
+        contratos: 0 // Será calculado depois
+      }));
+
+      setClientes(clientesFormatted);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      throw error;
+    }
+  };
+
+  const loadBancos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bancos')
+        .select('*')
+        .order('nome');
+
+      if (error) throw error;
+
+      const bancosFormatted: Banco[] = (data || []).map(banco => ({
+        id: banco.id,
+        nome: banco.nome,
+        codigo: banco.codigo,
+        taxaMedia: banco.taxa_media,
+        contato: banco.contato,
+        telefoneContato: banco.telefone_contato,
+        observacoes: banco.observacoes,
+        status: banco.status,
+        contratos: 0, // Será calculado depois
+        volumeTotal: 'R$ 0' // Será calculado depois
+      }));
+
+      setBancos(bancosFormatted);
+    } catch (error) {
+      console.error('Erro ao carregar bancos:', error);
+      throw error;
+    }
+  };
+
+  const loadContratos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          clientes!contratos_cliente_id_fkey(nome),
+          bancos!contratos_banco_id_fkey(nome)
+        `)
+        .order('data_emprestimo', { ascending: false });
+
+      if (error) throw error;
+
+      const contratosFormatted: Contrato[] = (data || []).map(contrato => {
+        const valorParcela = contrato.valor_total / contrato.parcelas;
+        const receitaAgente = (contrato.valor_total * (contrato.taxa / 100)) * 0.3; // 30% da receita
+
+        return {
+          id: contrato.id,
+          clienteId: contrato.cliente_id,
+          clienteNome: (contrato.clientes as any)?.nome || 'Cliente não encontrado',
+          bancoId: contrato.banco_id,
+          bancoNome: (contrato.bancos as any)?.nome || 'Banco não encontrado',
+          tipoContrato: contrato.tipo_contrato,
+          dataEmprestimo: contrato.data_emprestimo,
+          valorTotal: contrato.valor_total,
+          parcelas: contrato.parcelas,
+          valorParcela: valorParcela.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+          }),
+          taxa: contrato.taxa,
+          receitaAgente: receitaAgente.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+          }),
+          status: contrato.status,
+          observacoes: contrato.observacoes
+        };
+      });
+
+      setContratos(contratosFormatted);
+      updateMetrics(contratosFormatted);
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+      throw error;
+    }
+  };
+
+  const loadMetaAnual = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('meta_anual')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw error;
+      }
+
+      if (data) {
+        setMetaAnual(data.meta_anual);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar meta anual:', error);
+    }
+  };
+
+  const updateMetrics = (contratos: Contrato[]) => {
+    // Atualizar métricas dos clientes
+    setClientes(prev => prev.map(cliente => ({
+      ...cliente,
+      contratos: contratos.filter(c => c.clienteId === cliente.id).length
+    })));
+
+    // Atualizar métricas dos bancos
     setBancos(prev => prev.map(banco => {
-      const contratosDoBanco = contratos.filter(c => c.bancoId === banco.id);
-      const contratosAtivos = contratosDoBanco.filter(c => c.status === 'ativo');
-      const volumeTotal = contratosDoBanco.reduce((acc, contrato) => acc + contrato.valorTotal, 0);
-      
-      // Determinar status baseado em contratos ativos
-      const novoStatus = contratosAtivos.length > 0 ? 'ativo' : 'inativo';
+      const contratosBank = contratos.filter(c => c.bancoId === banco.id);
+      const volumeTotal = contratosBank.reduce((sum, c) => sum + c.valorTotal, 0);
       
       return {
         ...banco,
-        contratos: contratosDoBanco.length,
-        volumeTotal: `R$ ${volumeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        status: novoStatus as 'ativo' | 'inativo'
+        contratos: contratosBank.length,
+        volumeTotal: volumeTotal.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })
       };
     }));
   };
 
-  // Atualizar métricas dos bancos sempre que os contratos mudarem
-  useEffect(() => {
-    updateBancoMetrics();
-  }, [contratos]);
-
-  // Persistir dados no localStorage
-  useEffect(() => {
-    localStorage.setItem('maiacred_clientes', JSON.stringify(clientes));
-  }, [clientes]);
-
-  useEffect(() => {
-    localStorage.setItem('maiacred_bancos', JSON.stringify(bancos));
-  }, [bancos]);
-
-  useEffect(() => {
-    localStorage.setItem('maiacred_contratos', JSON.stringify(contratos));
-  }, [contratos]);
-
-  useEffect(() => {
-    localStorage.setItem('maiacred_meta_anual', metaAnual.toString());
-  }, [metaAnual]);
-
-  const addCliente = (clienteData: Omit<Cliente, 'id' | 'contratos' | 'status'>) => {
-    const novoCliente: Cliente = {
-      ...clienteData,
-      id: Date.now().toString(),
-      contratos: 0,
-      status: 'ativo'
-    };
-    setClientes(prev => [...prev, novoCliente]);
-  };
-
-  const updateCliente = (id: string, clienteData: Partial<Cliente>) => {
-    setClientes(prev => prev.map(cliente => 
-      cliente.id === id ? { ...cliente, ...clienteData } : cliente
-    ));
-  };
-
-  const deleteCliente = (id: string) => {
-    // Verificar se o cliente tem contratos ativos
-    const contratosDoCLiente = contratos.filter(c => c.clienteId === id);
-    if (contratosDoCLiente.length > 0) {
-      throw new Error('Não é possível excluir um cliente que possui contratos. Exclua os contratos primeiro.');
-    }
+  // Funções para CRUD de clientes
+  const addCliente = async (clienteData: Omit<Cliente, 'id' | 'contratos' | 'status'>): Promise<boolean> => {
+    if (!user) return false;
     
-    setClientes(prev => prev.filter(cliente => cliente.id !== id));
-  };
+    setIsLoading(true);
+    setError(null);
 
-  const addBanco = (bancoData: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>) => {
-    const novoBanco: Banco = {
-      ...bancoData,
-      id: Date.now().toString(),
-      contratos: 0,
-      volumeTotal: 'R$ 0,00',
-      status: 'inativo' // Inicia como inativo até ter contratos ativos
-    };
-    setBancos(prev => [...prev, novoBanco]);
-  };
+    try {
+      const clienteInsert: ClienteInsert = {
+        nome: clienteData.nome,
+        cpf: clienteData.cpf,
+        telefone: clienteData.telefone,
+        email: clienteData.email,
+        endereco: clienteData.endereco,
+        data_nascimento: clienteData.dataNascimento,
+        observacoes: clienteData.observacoes,
+        user_id: user.id
+      };
 
-  const updateBanco = (id: string, bancoData: Partial<Banco>) => {
-    setBancos(prev => prev.map(banco => 
-      banco.id === id ? { ...banco, ...bancoData } : banco
-    ));
-  };
+      const { error } = await supabase
+        .from('clientes')
+        .insert([clienteInsert]);
 
-  const deleteBanco = (id: string) => {
-    // Verificar se o banco tem contratos ativos
-    const contratosDoBanco = contratos.filter(c => c.bancoId === id);
-    if (contratosDoBanco.length > 0) {
-      throw new Error('Não é possível excluir um banco que possui contratos. Exclua os contratos primeiro.');
+      if (error) throw error;
+
+      await loadClientes();
+      return true;
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      setError('Erro ao adicionar cliente');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    
-    setBancos(prev => prev.filter(banco => banco.id !== id));
   };
 
-  const addContrato = (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>) => {
-    const cliente = clientes.find(c => c.id === contratoData.clienteId);
-    const banco = bancos.find(b => b.id === contratoData.bancoId);
+  const updateCliente = async (id: string, clienteData: Partial<Cliente>): Promise<boolean> => {
+    if (!user) return false;
     
-    if (!cliente || !banco) {
-      throw new Error('Cliente ou banco não encontrado');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const updateData: any = {};
+      if (clienteData.nome) updateData.nome = clienteData.nome;
+      if (clienteData.cpf) updateData.cpf = clienteData.cpf;
+      if (clienteData.telefone) updateData.telefone = clienteData.telefone;
+      if (clienteData.email) updateData.email = clienteData.email;
+      if (clienteData.endereco) updateData.endereco = clienteData.endereco;
+      if (clienteData.dataNascimento) updateData.data_nascimento = clienteData.dataNascimento;
+      if (clienteData.observacoes !== undefined) updateData.observacoes = clienteData.observacoes;
+      if (clienteData.status) updateData.status = clienteData.status;
+
+      const { error } = await supabase
+        .from('clientes')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadClientes();
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+      setError('Erro ao atualizar cliente');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    const valorParcela = contratoData.valorTotal / contratoData.parcelas;
-    const receitaAgente = contratoData.valorTotal * (contratoData.taxa / 100);
-
-    const novoContrato: Contrato = {
-      ...contratoData,
-      id: Date.now().toString(),
-      clienteNome: cliente.nome,
-      bancoNome: banco.nome,
-      valorParcela: `R$ ${valorParcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      receitaAgente: `R$ ${receitaAgente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      status: 'ativo'
-    };
-
-    setContratos(prev => [...prev, novoContrato]);
-
-    // Atualizar contador de contratos do cliente
-    updateCliente(contratoData.clienteId, {
-      contratos: cliente.contratos + 1
-    });
   };
 
-  const updateContrato = (id: string, contratoData: Partial<Contrato>) => {
-    setContratos(prev => prev.map(contrato => 
-      contrato.id === id ? { ...contrato, ...contratoData } : contrato
-    ));
+  const deleteCliente = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadClientes();
+      await loadContratos(); // Recarregar contratos pois podem ter sido afetados
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+      setError('Erro ao deletar cliente');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const deleteContrato = (id: string) => {
-    const contrato = contratos.find(c => c.id === id);
-    if (contrato) {
-      // Atualizar contador de contratos do cliente
-      const cliente = clientes.find(c => c.id === contrato.clienteId);
-      if (cliente && cliente.contratos > 0) {
-        updateCliente(contrato.clienteId, {
-          contratos: cliente.contratos - 1
+  // Continua com as demais funções...
+  const addBanco = async (bancoData: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const bancoInsert: BancoInsert = {
+        nome: bancoData.nome,
+        codigo: bancoData.codigo,
+        taxa_media: bancoData.taxaMedia,
+        contato: bancoData.contato,
+        telefone_contato: bancoData.telefoneContato,
+        observacoes: bancoData.observacoes,
+        user_id: user.id
+      };
+
+      const { error } = await supabase
+        .from('bancos')
+        .insert([bancoInsert]);
+
+      if (error) throw error;
+
+      await loadBancos();
+      return true;
+    } catch (error) {
+      console.error('Erro ao adicionar banco:', error);
+      setError('Erro ao adicionar banco');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateBanco = async (id: string, bancoData: Partial<Banco>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const updateData: any = {};
+      if (bancoData.nome) updateData.nome = bancoData.nome;
+      if (bancoData.codigo) updateData.codigo = bancoData.codigo;
+      if (bancoData.taxaMedia !== undefined) updateData.taxa_media = bancoData.taxaMedia;
+      if (bancoData.contato) updateData.contato = bancoData.contato;
+      if (bancoData.telefoneContato) updateData.telefone_contato = bancoData.telefoneContato;
+      if (bancoData.observacoes) updateData.observacoes = bancoData.observacoes;
+      if (bancoData.status) updateData.status = bancoData.status;
+
+      const { error } = await supabase
+        .from('bancos')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadBancos();
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar banco:', error);
+      setError('Erro ao atualizar banco');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteBanco = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('bancos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadBancos();
+      await loadContratos(); // Recarregar contratos pois podem ter sido afetados
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar banco:', error);
+      setError('Erro ao deletar banco');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const contratoInsert: ContratoInsert = {
+        cliente_id: contratoData.clienteId,
+        banco_id: contratoData.bancoId,
+        tipo_contrato: contratoData.tipoContrato,
+        data_emprestimo: contratoData.dataEmprestimo,
+        valor_total: contratoData.valorTotal,
+        parcelas: contratoData.parcelas,
+        taxa: contratoData.taxa,
+        observacoes: contratoData.observacoes,
+        user_id: user.id
+      };
+
+      const { error } = await supabase
+        .from('contratos')
+        .insert([contratoInsert]);
+
+      if (error) throw error;
+
+      await loadContratos();
+      return true;
+    } catch (error) {
+      console.error('Erro ao adicionar contrato:', error);
+      setError('Erro ao adicionar contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateContrato = async (id: string, contratoData: Partial<Contrato>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const updateData: any = {};
+      if (contratoData.clienteId) updateData.cliente_id = contratoData.clienteId;
+      if (contratoData.bancoId) updateData.banco_id = contratoData.bancoId;
+      if (contratoData.tipoContrato) updateData.tipo_contrato = contratoData.tipoContrato;
+      if (contratoData.dataEmprestimo) updateData.data_emprestimo = contratoData.dataEmprestimo;
+      if (contratoData.valorTotal !== undefined) updateData.valor_total = contratoData.valorTotal;
+      if (contratoData.parcelas !== undefined) updateData.parcelas = contratoData.parcelas;
+      if (contratoData.taxa !== undefined) updateData.taxa = contratoData.taxa;
+      if (contratoData.status) updateData.status = contratoData.status;
+      if (contratoData.observacoes !== undefined) updateData.observacoes = contratoData.observacoes;
+
+      const { error } = await supabase
+        .from('contratos')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadContratos();
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar contrato:', error);
+      setError('Erro ao atualizar contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteContrato = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('contratos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadContratos();
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar contrato:', error);
+      setError('Erro ao deletar contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateMetaAnual = async (meta: number): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('configuracoes')
+        .upsert({ 
+          user_id: user.id, 
+          meta_anual: meta 
+        }, {
+          onConflict: 'user_id'
         });
-      }
+
+      if (error) throw error;
+
+      setMetaAnual(meta);
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar meta anual:', error);
+      setError('Erro ao atualizar meta anual');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    
-    setContratos(prev => prev.filter(contrato => contrato.id !== id));
   };
 
   const getClienteById = (id: string) => {
@@ -348,15 +616,13 @@ export function DataProvider({ children }: DataProviderProps) {
     return bancos.find(banco => banco.id === id);
   };
 
-  const updateMetaAnual = (meta: number) => {
-    setMetaAnual(meta);
-  };
-
   const value: DataContextType = {
     clientes,
     bancos,
     contratos,
     metaAnual,
+    isLoading,
+    error,
     addCliente,
     updateCliente,
     deleteCliente,
@@ -368,7 +634,8 @@ export function DataProvider({ children }: DataProviderProps) {
     deleteContrato,
     updateMetaAnual,
     getClienteById,
-    getBancoById
+    getBancoById,
+    refreshData
   };
 
   return (

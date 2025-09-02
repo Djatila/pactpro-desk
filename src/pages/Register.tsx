@@ -36,7 +36,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { register: registerUser, isLoading, checkAdminExists } = useAuth();
+  const { register: registerUser, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const {
@@ -53,12 +53,6 @@ export default function Register() {
     setSuccess('');
     
     try {
-      // Verificar se já existe um admin registrado
-      if (checkAdminExists()) {
-        setError('Já existe um administrador registrado no sistema.');
-        return;
-      }
-
       const success = await registerUser({
         nome: data.nome,
         email: data.email,
@@ -79,29 +73,7 @@ export default function Register() {
     }
   };
 
-  // Se já existe admin, redirecionar para login
-  if (checkAdminExists()) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent/50 to-background p-4">
-        <div className="w-full max-w-md space-y-6">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-center text-destructive">Acesso Negado</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p>Já existe um administrador registrado no sistema.</p>
-              <Link to="/login">
-                <Button className="w-full">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar ao Login
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent/50 to-background p-4">
@@ -122,10 +94,10 @@ export default function Register() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Criar Primeira Conta
+              Criar Nova Conta
             </CardTitle>
             <CardDescription className="text-center">
-              Configure sua conta de administrador para acessar o sistema
+              Configure sua conta para acessar o sistema
             </CardDescription>
           </CardHeader>
           <CardContent>

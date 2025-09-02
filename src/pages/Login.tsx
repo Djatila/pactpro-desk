@@ -21,7 +21,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login, isLoading, checkAdminExists } = useAuth();
+  const { login, isLoading, error: authError } = useAuth();
   const navigate = useNavigate();
 
   const {
@@ -36,13 +36,18 @@ export default function Login() {
     setError('');
     
     try {
+      console.log('Iniciando login...', data.email);
       const success = await login(data.email, data.password);
       if (success) {
+        console.log('Login bem-sucedido, redirecionando...');
         navigate('/');
       } else {
-        setError('Email ou senha incorretos');
+        const errorMsg = authError || 'Email ou senha incorretos';
+        setError(errorMsg);
+        console.error('Falha no login:', errorMsg);
       }
     } catch (error) {
+      console.error('Erro no processo de login:', error);
       setError('Erro interno do servidor. Tente novamente.');
     }
   };
@@ -71,9 +76,9 @@ export default function Login() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {error && (
+              {(error || authError) && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{error || authError}</AlertDescription>
                 </Alert>
               )}
 
@@ -137,33 +142,17 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Link para Registro (apenas se não houver admin) */}
-            {!checkAdminExists() && (
-              <div className="mt-4 text-center">
-                <Link to="/register">
-                  <Button variant="outline" className="w-full">
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Criar Primeira Conta de Administrador
-                  </Button>
-                </Link>
-              </div>
-            )}
+            {/* Link para Registro */}
+            <div className="mt-4 text-center">
+              <Link to="/register">
+                <Button variant="outline" className="w-full">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Criar Nova Conta
+                </Button>
+              </Link>
+            </div>
 
-            {/* Credenciais de Demonstração */}
-            {!checkAdminExists() && (
-              <div className="mt-6 p-4 bg-accent/50 rounded-lg">
-                <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Credenciais para demonstração:
-                </p>
-                <div className="text-sm space-y-1">
-                  <p><strong>Email:</strong> admin@maiacred.com</p>
-                  <p><strong>Senha:</strong> 123456</p>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Ou crie sua própria conta de administrador acima
-                </p>
-              </div>
-            )}
+
           </CardContent>
         </Card>
       </div>

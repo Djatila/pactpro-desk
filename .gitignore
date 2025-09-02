@@ -53,3 +53,4 @@ coverage/
 
 # PWA files
 dev-dist/
+.vercel
