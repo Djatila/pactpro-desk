@@ -210,7 +210,7 @@ export function DataProvider({ children }: DataProviderProps) {
         contato: banco.contato,
         telefoneContato: banco.telefone_contato,
         observacoes: banco.observacoes,
-        status: banco.status,
+        status: 'inativo', // Será atualizado automaticamente pelo updateMetrics
         contratos: 0, // Será calculado depois
         volumeTotal: 'R$ 0' // Será calculado depois
       }));
@@ -292,6 +292,8 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const updateMetrics = (contratos: Contrato[]) => {
+    console.log('📊 Atualizando métricas dos bancos e clientes...');
+    
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
       const updatedClientes = prev.map(cliente => {
@@ -323,12 +325,18 @@ export function DataProvider({ children }: DataProviderProps) {
           currency: 'BRL'
         });
         
+        // Determinar status automaticamente baseado na existência de contratos
+        const newStatus: 'ativo' | 'inativo' = newContratosCount > 0 ? 'ativo' : 'inativo';
+        
         // Só retornar novo objeto se realmente mudou
-        if (banco.contratos !== newContratosCount || banco.volumeTotal !== newVolumeTotalFormatted) {
+        if (banco.contratos !== newContratosCount || 
+            banco.volumeTotal !== newVolumeTotalFormatted ||
+            banco.status !== newStatus) {
           return {
             ...banco,
             contratos: newContratosCount,
-            volumeTotal: newVolumeTotalFormatted
+            volumeTotal: newVolumeTotalFormatted,
+            status: newStatus
           };
         }
         return banco; // Manter referência se não mudou
@@ -459,6 +467,7 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       await loadBancos();
+      await loadContratos(); // Recarregar contratos para atualizar status automaticamente
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar banco');
