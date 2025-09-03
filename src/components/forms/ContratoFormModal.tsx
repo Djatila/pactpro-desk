@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { contratoSchema, type ContratoFormData, formatDate, formatCurrency, getTiposContrato } from '@/lib/validations';
+import { getProximoNumeroContrato } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, FileText, Calendar } from 'lucide-react';
+import { Loader2, FileText, Calendar, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ContratoFormModalProps {
@@ -29,7 +30,7 @@ export function ContratoFormModal({
 }: ContratoFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tiposContrato, setTiposContrato] = useState(getTiposContrato());
-  const { clientes, bancos } = useData();
+  const { clientes, bancos, contratos } = useData();
 
   const {
     register,
@@ -51,6 +52,15 @@ export function ContratoFormModal({
   const clienteId = watch('clienteId');
   const bancoId = watch('bancoId');
   const tipoContrato = watch('tipoContrato');
+
+  // Função para obter data atual no formato DD/MM/AAAA
+  const getDataAtual = (): string => {
+    const hoje = new Date();
+    const dia = hoje.getDate().toString().padStart(2, '0');
+    const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+    const ano = hoje.getFullYear();
+    return `${dia}/${mes}/${ano}`;
+  };
 
   // Atualizar tipos de contrato quando o modal abrir
   useEffect(() => {
@@ -77,12 +87,13 @@ export function ContratoFormModal({
       }
     } else if (mode === 'create') {
       // Reset para formulário vazio quando for criação
+      const dataAtual = getDataAtual();
       reset({
         clienteId: '',
         bancoId: '',
         tipoContrato: 'consignado-previdencia' as const,
         valorTotal: 0,
-        dataEmprestimo: '',
+        dataEmprestimo: dataAtual, // Preencher automaticamente com a data atual
         parcelas: 0,
         taxa: 0,
         observacoes: ''
@@ -153,6 +164,11 @@ export function ContratoFormModal({
   // Cálculos automáticos
   const valorParcela = valorTotal && parcelas ? (valorTotal / parcelas).toFixed(2) : '0';
   const receitaEstimada = valorTotal && taxa ? (valorTotal * (taxa / 100)).toFixed(2) : '0';
+  
+  // Prévia da nomenclatura do contrato
+  const previaContratoNome = dataEmprestimo && mode === 'create' 
+    ? getProximoNumeroContrato(contratos, dataEmprestimo)
+    : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -186,9 +202,9 @@ export function ContratoFormModal({
                           {cliente.nome} {cliente.status === 'inativo' ? '(Inativo)' : ''}
                         </SelectItem>
                       ))
-                    : clientes.filter(cliente => cliente.status === 'ativo').map((cliente) => (
+                    : clientes.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome}
+                          {cliente.nome} {cliente.status === 'inativo' ? '(Inativo)' : ''}
                         </SelectItem>
                       ))
                   }
@@ -352,6 +368,24 @@ export function ContratoFormModal({
               </div>
             </div>
           ) : null}
+
+          {/* Prévia da Nomenclatura do Contrato */}
+          {previaContratoNome && (
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center justify-center gap-3">
+                <Hash className="h-5 w-5 text-primary" />
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Nomenclatura do Contrato</p>
+                  <p className="text-lg font-bold text-primary">
+                    {previaContratoNome}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sequência global baseada no total de contratos
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Observações */}
           <div className="space-y-2">

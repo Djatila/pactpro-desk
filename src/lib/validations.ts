@@ -161,9 +161,13 @@ export const contratoSchema = z.object({
       const [day, month, year] = date.split('/').map(Number);
       const inputDate = new Date(year, month - 1, day);
       const today = new Date();
+      
+      // Normalizar as datas para comparar apenas dia/mês/ano (sem horário)
+      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const inputNormalized = new Date(year, month - 1, day);
       const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
       
-      return inputDate <= maxDate && inputDate >= today;
+      return inputNormalized >= todayNormalized && inputNormalized <= maxDate;
     }, 'Data deve ser hoje ou no futuro (máximo 1 ano)'),
   
   observacoes: z.string().optional()
