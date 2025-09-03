@@ -150,10 +150,13 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      // Carregar contratos primeiro para que updateMetrics seja chamado antes
+      await loadContratos();
+      
+      // Depois carregar clientes, bancos e configurações em paralelo
       await Promise.all([
         loadClientes(),
         loadBancos(),
-        loadContratos(),
         loadMetaAnual()
       ]);
     } catch (error) {
