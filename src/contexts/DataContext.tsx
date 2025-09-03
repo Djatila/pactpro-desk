@@ -150,15 +150,17 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
-      // Carregar contratos primeiro para que updateMetrics seja chamado antes
-      await loadContratos();
-      
-      // Depois carregar clientes, bancos e configurações em paralelo
+      // Carregar clientes e bancos primeiro para ter a lista completa
       await Promise.all([
         loadClientes(),
-        loadBancos(),
-        loadMetaAnual()
+        loadBancos()
       ]);
+      
+      // Depois carregar contratos e atualizar métricas
+      await loadContratos();
+      
+      // Por fim carregar configurações
+      await loadMetaAnual();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados');
@@ -185,7 +187,7 @@ export function DataProvider({ children }: DataProviderProps) {
         endereco: cliente.endereco,
         dataNascimento: cliente.data_nascimento,
         observacoes: cliente.observacoes,
-        status: 'inativo', // Será calculado com base nos contratos
+        status: 'inativo', // Será atualizado automaticamente pelo updateMetrics
         contratos: 0 // Será calculado depois
       }));
 
@@ -296,6 +298,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const updateMetrics = (contratos: Contrato[]) => {
     console.log('📊 Atualizando métricas dos bancos e clientes...');
+    console.log('📈 Contratos carregados:', contratos.length);
     
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
@@ -307,8 +310,11 @@ export function DataProvider({ children }: DataProviderProps) {
         const hasContratosAtivos = clienteContratos.some(c => c.status === 'ativo');
         const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
         
+        console.log(`👤 Cliente ${cliente.nome}: ${clienteContratos.length} contratos, ${hasContratosAtivos ? 'ativo' : 'inativo'}`);
+        
         // Só retornar novo objeto se realmente mudou
         if (cliente.contratos !== newContratosCount || cliente.status !== newStatus) {
+          console.log(`🔄 Atualizando cliente ${cliente.nome}: ${cliente.status} -> ${newStatus}`);
           return {
             ...cliente,
             contratos: newContratosCount,
@@ -334,13 +340,17 @@ export function DataProvider({ children }: DataProviderProps) {
           currency: 'BRL'
         });
         
-        // Determinar status automaticamente baseado na existência de contratos
-        const newStatus: 'ativo' | 'inativo' = newContratosCount > 0 ? 'ativo' : 'inativo';
+        // Determinar status automaticamente baseado na existência de contratos ativos
+        const hasContratosAtivos = contratosBank.some(c => c.status === 'ativo');
+        const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
+        
+        console.log(`🏦 Banco ${banco.nome}: ${contratosBank.length} contratos, ${newStatus}`);
         
         // Só retornar novo objeto se realmente mudou
         if (banco.contratos !== newContratosCount || 
             banco.volumeTotal !== newVolumeTotalFormatted ||
             banco.status !== newStatus) {
+          console.log(`🔄 Atualizando banco ${banco.nome}: ${banco.status} -> ${newStatus}`);
           return {
             ...banco,
             contratos: newContratosCount,
@@ -383,10 +393,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadClientes(),
-        loadContratos() // Para atualizar métricas dos clientes
-      ]);
+      await loadClientes();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar cliente');
@@ -421,10 +429,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadClientes(),
-        loadContratos() // Para atualizar métricas dos clientes
-      ]);
+      await loadClientes();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'atualizar cliente');
@@ -449,10 +455,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadClientes(),
-        loadContratos() // Para atualizar métricas dos clientes e bancos
-      ]);
+      await loadClientes();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'deletar cliente');
@@ -487,10 +491,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadBancos(),
-        loadContratos() // Para atualizar status dos bancos
-      ]);
+      await loadBancos();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar banco');
@@ -524,10 +526,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadBancos(),
-        loadContratos() // Para atualizar status dos bancos
-      ]);
+      await loadBancos();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       console.error('Erro ao atualizar banco:', error);
@@ -553,10 +553,8 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
-      await Promise.all([
-        loadBancos(),
-        loadContratos() // Para atualizar métricas
-      ]);
+      await loadBancos();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       console.error('Erro ao deletar banco:', error);
@@ -593,10 +591,10 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
       await Promise.all([
-        loadContratos(),
-        loadClientes(), // Para atualizar status dos clientes
-        loadBancos()    // Para atualizar status dos bancos
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
       ]);
       return true;
     } catch (error) {
@@ -634,10 +632,10 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
       await Promise.all([
-        loadContratos(),
-        loadClientes(), // Para atualizar status dos clientes
-        loadBancos()    // Para atualizar status dos bancos
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
       ]);
       return true;
     } catch (error) {
@@ -664,10 +662,10 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
       await Promise.all([
-        loadContratos(),
-        loadClientes(), // Para atualizar status dos clientes
-        loadBancos()    // Para atualizar status dos bancos
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
       ]);
       return true;
     } catch (error) {
