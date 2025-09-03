@@ -185,7 +185,7 @@ export function DataProvider({ children }: DataProviderProps) {
         endereco: cliente.endereco,
         dataNascimento: cliente.data_nascimento,
         observacoes: cliente.observacoes,
-        status: cliente.status,
+        status: 'inativo', // Será calculado com base nos contratos
         contratos: 0 // Será calculado depois
       }));
 
