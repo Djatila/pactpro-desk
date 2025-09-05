@@ -55,11 +55,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const getSession = async () => {
       try {
-        // Timeout aumentado para PCs com conectividade mais lenta (10 segundos)
+        // Timeout aumentado para PCs com conectividade mais lenta (15 segundos)
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error('Timeout na verificação de sessão'));
-          }, 10000); // Aumentado de 5s para 10s
+          }, 15000); // Aumentado de 10s para 15s para maior tolerância
         });
 
         // Verificação inicial rápida - tentar localStorage primeiro
@@ -71,8 +71,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
               setUser(parsedUser);
               setIsLoading(false);
               setInitialCheckDone(true);
-              // Verificar sessão em background
-              setTimeout(() => getSession(), 100);
+              // Verificar sessão em background após um curto delay
+              setTimeout(() => {
+                if (isMounted) {
+                  getSession();
+                }
+              }, 500);
               return;
             }
           } catch (error) {
@@ -90,13 +94,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
-        const sessionPromise = supabase.auth.getSession();
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
+        // Tentar obter a sessão com múltiplas tentativas em caso de falha
+        let sessionResult;
+        let attempt = 0;
+        const maxAttempts = 3;
         
+        while (attempt < maxAttempts) {
+          try {
+            const sessionPromise = supabase.auth.getSession();
+            sessionResult = await Promise.race([
+              sessionPromise,
+              timeoutPromise
+            ]);
+            break; // Se sucesso, sair do loop
+          } catch (error) {
+            attempt++;
+            console.warn(`Tentativa ${attempt} de obter sessão falhou:`, error);
+            if (attempt >= maxAttempts) {
+              throw error; // Se todas as tentativas falharem, lançar o erro
+            }
+            // Aguardar um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+        }
+
         clearTimeout(timeoutId);
+        
+        if (!sessionResult) {
+          throw new Error('Não foi possível obter a sessão');
+        }
+
+        const { data: { session }, error } = sessionResult as any;
         
         if (error) {
           console.error('Erro ao obter sessão:', error);

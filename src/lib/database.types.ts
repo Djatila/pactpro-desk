@@ -130,6 +130,14 @@ export interface Database {
           user_id: string;
           created_at: string;
           updated_at: string;
+          // Novos campos
+          primeiro_vencimento: string;
+          valor_operacao: number;
+          valor_solicitado: number;
+          valor_prestacao: number;
+          // Campos para PDF (tornados opcionais)
+          pdf_url?: string;
+          pdf_name?: string;
         };
         Insert: {
           id?: string;
@@ -145,6 +153,14 @@ export interface Database {
           user_id: string;
           created_at?: string;
           updated_at?: string;
+          // Novos campos
+          primeiro_vencimento: string;
+          valor_operacao: number;
+          valor_solicitado: number;
+          valor_prestacao: number;
+          // Campos para PDF (opcionais na inserção)
+          pdf_url?: string;
+          pdf_name?: string;
         };
         Update: {
           id?: string;
@@ -160,6 +176,14 @@ export interface Database {
           user_id?: string;
           created_at?: string;
           updated_at?: string;
+          // Novos campos
+          primeiro_vencimento?: string;
+          valor_operacao?: number;
+          valor_solicitado?: number;
+          valor_prestacao?: number;
+          // Campos para PDF (opcionais na atualização)
+          pdf_url?: string;
+          pdf_name?: string;
         };
       };
       configuracoes: {
