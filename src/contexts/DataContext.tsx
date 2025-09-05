@@ -7,7 +7,9 @@ import type {
   Contrato as ContratoDB,
   ClienteInsert,
   BancoInsert,
-  ContratoInsert
+  ContratoInsert,
+  TipoContrato as TipoContratoDB,
+  TipoContratoInsert
 } from '@/lib/database.types';
 
 // Tipos para compatibilidade com a interface atual
@@ -86,6 +88,11 @@ interface DataContextType {
   uploadContratoPdf: (contratoId: string, file: File | null) => Promise<boolean>;
   // Função para download de PDF
   downloadContratoPdf: (contratoId: string) => Promise<void>;
+  // Funções para gerenciamento de tipos de contrato
+  loadTiposContrato: () => Promise<any[]>;
+  addTipoContrato: (tipo: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<boolean>;
+  updateTipoContrato: (id: string, tipo: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => Promise<boolean>;
+  deleteTipoContrato: (id: string) => Promise<boolean>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -1085,6 +1092,176 @@ export function DataProvider({ children }: DataProviderProps) {
     return bancos.find(banco => banco.id === id);
   };
 
+  // Funções para gerenciamento de tipos de contrato
+  const loadTiposContrato = async (): Promise<any[]> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('tipos_contrato')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('label');
+
+      if (error) {
+        console.error('Erro ao carregar tipos de contrato:', error);
+        // Se for um erro de tabela não encontrada, retornar tipos padrão
+        if (error.message.includes('relation') && error.message.includes('does not exist')) {
+          console.log('Tabela tipos_contrato não encontrada, retornando tipos padrão');
+          return [
+            { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
+            { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
+            { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', is_default: true },
+            { value: 'fgts', label: 'FGTS', is_default: true },
+            { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', is_default: true },
+            { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', is_default: true },
+            { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', is_default: true }
+          ];
+        }
+        throw error;
+      }
+      
+      // Se não houver tipos cadastrados, inserir os padrões
+      if (!data || data.length === 0) {
+        const tiposDefault = [
+          { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
+          { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
+          { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', is_default: true },
+          { value: 'fgts', label: 'FGTS', is_default: true },
+          { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', is_default: true },
+          { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', is_default: true },
+          { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', is_default: true }
+        ];
+        
+        // Inserir tipos padrão
+        const tiposInsert = tiposDefault.map(tipo => ({
+          ...tipo,
+          user_id: user.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('tipos_contrato')
+          .insert(tiposInsert);
+          
+        if (insertError) {
+          console.error('Erro ao inserir tipos de contrato padrão:', insertError);
+          // Mesmo se falhar, retornar os tipos padrão
+          return tiposDefault;
+        }
+        
+        return tiposDefault;
+      }
+      
+      return data.map(tipo => ({
+        id: tipo.id,
+        value: tipo.value,
+        label: tipo.label,
+        isDefault: tipo.is_default
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar tipos de contrato:', error);
+      // Retornar tipos padrão em caso de erro
+      return [
+        { value: 'consignado-previdencia', label: 'Consignado Previdência', isDefault: true },
+        { value: 'consignado-clt', label: 'Consignado CLT', isDefault: true },
+        { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', isDefault: true },
+        { value: 'fgts', label: 'FGTS', isDefault: true },
+        { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', isDefault: true },
+        { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', isDefault: true },
+        { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', isDefault: true }
+      ];
+    }
+  };
+
+  const addTipoContrato = async (tipoData: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const tipoInsert: TipoContratoInsert = {
+        ...tipoData,
+        user_id: user.id
+      };
+
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .insert([tipoInsert]);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'adicionar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateTipoContrato = async (id: string, tipoData: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .update(tipoData)
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'atualizar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteTipoContrato = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Verificar se é um tipo padrão
+      const { data, error: selectError } = await supabase
+        .from('tipos_contrato')
+        .select('is_default')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (selectError) throw selectError;
+      
+      if (data?.is_default) {
+        throw new Error('Não é possível excluir tipos de contrato padrão do sistema');
+      }
+
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'deletar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value: DataContextType = {
     clientes,
     bancos,
@@ -1108,33 +1285,16 @@ export function DataProvider({ children }: DataProviderProps) {
     // Função para upload de PDF
     uploadContratoPdf,
     // Função para download de PDF
-    downloadContratoPdf
+    downloadContratoPdf,
+    // Funções para gerenciamento de tipos de contrato
+    loadTiposContrato,
+    addTipoContrato,
+    updateTipoContrato,
+    deleteTipoContrato
   };
 
   return (
-    <DataContext.Provider value={{
-      clientes,
-      bancos,
-      contratos,
-      metaAnual,
-      isLoading,
-      error,
-      addCliente,
-      updateCliente,
-      deleteCliente,
-      addBanco,
-      updateBanco,
-      deleteBanco,
-      addContrato,
-      updateContrato,
-      deleteContrato,
-      updateMetaAnual,
-      getClienteById,
-      getBancoById,
-      refreshData,
-      uploadContratoPdf,
-      downloadContratoPdf
-    }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );

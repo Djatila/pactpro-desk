@@ -130,17 +130,9 @@ export const contratoSchema = z.object({
   bancoId: z.string()
     .min(1, 'Selecione um banco'),
   
-  tipoContrato: z.enum([
-    'consignado-previdencia',
-    'consignado-clt',
-    'emprestimo-pessoal',
-    'fgts',
-    'emp-bolsa-familia',
-    'emp-conta-energia',
-    'emp-bpc-loas'
-  ], {
+  tipoContrato: z.string({
     errorMap: () => ({ message: 'Selecione um tipo de contrato' })
-  }),
+  }).min(1, 'Selecione um tipo de contrato'),
   
   valorTotal: z.number()
     .min(1000, 'Valor mínimo é R$ 1.000,00')
@@ -183,17 +175,11 @@ export type ContratoFormData = z.infer<typeof contratoSchema>;
 // Removemos os campos de PDF do tipo pois eles são gerenciados separadamente
 // Tipos TypeScript derivados dos schemas
 
-// Função para obter tipos de contrato do localStorage ou padrão
+// Função para obter tipos de contrato do contexto de dados ou padrão
+// Esta função deve ser usada em conjunto com o DataContext
 export const getTiposContrato = () => {
-  const savedTipos = localStorage.getItem('tiposContrato');
-  if (savedTipos) {
-    try {
-      const tipos = JSON.parse(savedTipos);
-      return tipos.map((tipo: any) => ({ value: tipo.value, label: tipo.label }));
-    } catch {
-      // Se houver erro no parse, usar tipos padrão
-    }
-  }
+  // Esta função agora é apenas um fallback para manter compatibilidade
+  // O componente ContratoFormModal agora carrega os tipos diretamente do contexto
   
   // Tipos padrão
   return [

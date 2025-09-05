@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { contratoSchema, type ContratoFormData, formatDate, formatCurrency, getTiposContrato } from '@/lib/validations';
+import { contratoSchema, type ContratoFormData, formatDate, formatCurrency } from '@/lib/validations';
 import { getProximoNumeroContrato } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
 import { ContratoPdfManager } from '@/components/ContratoPdfManager';
@@ -34,8 +34,8 @@ export function ContratoFormModal({
   mode = 'create' 
 }: ContratoFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tiposContrato, setTiposContrato] = useState(getTiposContrato());
-  const { clientes, bancos, contratos } = useData();
+  const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
+  const { clientes, bancos, contratos, loadTiposContrato } = useData();
 
   const {
     register,
@@ -99,10 +99,19 @@ export function ContratoFormModal({
 
   // Atualizar tipos de contrato quando o modal abrir
   useEffect(() => {
-    if (isOpen) {
-      setTiposContrato(getTiposContrato());
-    }
-  }, [isOpen]);
+    const loadTipos = async () => {
+      if (isOpen) {
+        try {
+          const tipos = await loadTiposContrato();
+          setTiposContrato(tipos);
+        } catch (error) {
+          console.error('Erro ao carregar tipos de contrato:', error);
+        }
+      }
+    };
+    
+    loadTipos();
+  }, [isOpen, loadTiposContrato]);
 
   // Reset do formulário quando initialData mudar ou modal abrir/fechar
   useEffect(() => {
@@ -127,7 +136,7 @@ export function ContratoFormModal({
       reset({
         clienteId: '',
         bancoId: '',
-        tipoContrato: 'consignado-previdencia' as const,
+        tipoContrato: '',
         valorTotal: 0,
         dataEmprestimo: dataAtual, // Preencher automaticamente com a data atual
         parcelas: 0,

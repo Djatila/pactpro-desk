@@ -40,6 +40,7 @@ export default function Contratos() {
   const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf } = useData();
+  const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
 
   // Filtro por banco via URL
   const bancoFilter = searchParams.get('banco');
@@ -149,10 +150,12 @@ export default function Contratos() {
     }
   };
 
-  const handleTiposChange = (tipos: any[]) => {
-    // Forçar atualização dos tipos de contrato
-    // Isso será usado para atualizar os selects quando necessário
-    console.log('Tipos de contrato atualizados:', tipos);
+  const handleTiposChange = async () => {
+    // Atualizar os tipos de contrato quando houver mudanças
+    console.log('Tipos de contrato atualizados');
+    // Recarregar os tipos de contrato
+    const novosTipos = await loadTiposContrato();
+    setTiposContrato(novosTipos);
   };
 
   const filteredContratos = contratos.filter(contrato => {
