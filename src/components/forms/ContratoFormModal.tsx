@@ -72,6 +72,31 @@ export function ContratoFormModal({
     return `${dia}/${mes}/${ano}`;
   };
 
+  // Função para formatar valor monetário no padrão brasileiro (1.000,00)
+  const formatCurrencyInput = (value: number | string): string => {
+    if (value === '' || value === undefined || value === null) return '';
+    
+    // Converter para número se for string
+    const numValue = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+    
+    if (isNaN(numValue)) return '';
+    
+    // Formatar com separador de milhar e decimal
+    return numValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Função para parsear valor monetário do formato brasileiro para número
+  const parseCurrencyInput = (value: string): number => {
+    if (!value) return 0;
+    
+    // Remover pontos e substituir vírgula por ponto para parse
+    const cleanValue = value.replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleanValue) || 0;
+  };
+
   // Atualizar tipos de contrato quando o modal abrir
   useEffect(() => {
     if (isOpen) {
@@ -150,7 +175,7 @@ export function ContratoFormModal({
   };
 
   // Calcular data de término automaticamente
-  const dataTermino = calculateEndDate(dataEmprestimo, parcelas);
+  const dataTermino = calculateEndDate(primeiroVencimento, parcelas);
 
   const handleFormSubmit = async (data: ContratoFormData) => {
     console.log('Submetendo formulário de contrato', { data, mode });
@@ -323,12 +348,16 @@ export function ContratoFormModal({
               <Label htmlFor="valorTotal">Valor Total do Empréstimo (R$) *</Label>
               <Input
                 id="valorTotal"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
                 {...register('valorTotal', { valueAsNumber: true })}
+                value={valorTotal ? formatCurrencyInput(valorTotal) : ''}
                 onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorTotal', value);
+                }}
+                onBlur={(e) => {
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
                   setValue('valorTotal', value);
                 }}
               />
@@ -385,7 +414,7 @@ export function ContratoFormModal({
                 id="valorParcela"
                 type="text"
                 readOnly
-                value={valorParcela ? formatCurrency(parseFloat(valorParcela)) : 'R$ 0,00'}
+                value={valorParcela ? formatCurrencyInput(parseFloat(valorParcela)) : '0,00'}
               />
             </div>
 
@@ -395,13 +424,17 @@ export function ContratoFormModal({
                 <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="taxa"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
                   className="pl-9"
                   {...register('taxa', { valueAsNumber: true })}
+                  value={taxa ? formatCurrencyInput(taxa) : ''}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
+                    const value = parseCurrencyInput(e.target.value);
+                    setValue('taxa', value);
+                  }}
+                  onBlur={(e) => {
+                    // Formatar o valor ao sair do campo
+                    const value = parseCurrencyInput(e.target.value);
                     setValue('taxa', value);
                   }}
                 />
@@ -418,7 +451,7 @@ export function ContratoFormModal({
             <Input
               type="text"
               readOnly
-              value={receitaEstimada ? formatCurrency(parseFloat(receitaEstimada)) : 'R$ 0,00'}
+              value={receitaEstimada ? formatCurrencyInput(parseFloat(receitaEstimada)) : '0,00'}
             />
           </div>
 
@@ -462,12 +495,16 @@ export function ContratoFormModal({
               <Label htmlFor="valorOperacao">Valor da Operação (R$)</Label>
               <Input
                 id="valorOperacao"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
                 {...register('valorOperacao', { valueAsNumber: true })}
+                value={valorOperacao ? formatCurrencyInput(valorOperacao) : ''}
                 onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorOperacao', value);
+                }}
+                onBlur={(e) => {
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
                   setValue('valorOperacao', value);
                 }}
               />
@@ -480,12 +517,16 @@ export function ContratoFormModal({
               <Label htmlFor="valorSolicitado">Valor Solicitado (R$)</Label>
               <Input
                 id="valorSolicitado"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
                 {...register('valorSolicitado', { valueAsNumber: true })}
+                value={valorSolicitado ? formatCurrencyInput(valorSolicitado) : ''}
                 onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorSolicitado', value);
+                }}
+                onBlur={(e) => {
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
                   setValue('valorSolicitado', value);
                 }}
               />
@@ -498,12 +539,16 @@ export function ContratoFormModal({
               <Label htmlFor="valorPrestacao">Valor da Prestação (R$)</Label>
               <Input
                 id="valorPrestacao"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
                 {...register('valorPrestacao', { valueAsNumber: true })}
+                value={valorPrestacao ? formatCurrencyInput(valorPrestacao) : ''}
                 onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorPrestacao', value);
+                }}
+                onBlur={(e) => {
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
                   setValue('valorPrestacao', value);
                 }}
               />
