@@ -124,19 +124,53 @@ export const bancoSchema = z.object({
 
 // Schema para Contrato
 export const contratoSchema = z.object({
-  clienteId: z.string().min(1, 'Cliente é obrigatório'),
-  bancoId: z.string().min(1, 'Banco é obrigatório'),
-  tipoContrato: z.string().min(1, 'Tipo de contrato é obrigatório'),
-  dataEmprestimo: z.string().min(1, 'Data do empréstimo é obrigatória'),
-  valorTotal: z.number().min(0.01, 'Valor total deve ser maior que zero'),
-  parcelas: z.number().min(1, 'Número de parcelas deve ser maior que zero'),
-  taxa: z.number().min(0, 'Taxa não pode ser negativa'),
-  observacoes: z.string().optional(),
-  // Novos campos
-  primeiroVencimento: z.string().min(1, 'Primeiro vencimento é obrigatório'),
-  valorOperacao: z.number().min(0, 'Valor da operação não pode ser negativo'),
-  valorSolicitado: z.number().min(0, 'Valor solicitado não pode ser negativo'),
-  valorPrestacao: z.number().min(0, 'Valor da prestação não pode ser negativo')
+  clienteId: z.string()
+    .min(1, 'Selecione um cliente'),
+  
+  bancoId: z.string()
+    .min(1, 'Selecione um banco'),
+  
+  tipoContrato: z.enum([
+    'consignado-previdencia',
+    'consignado-clt',
+    'emprestimo-pessoal',
+    'fgts',
+    'emp-bolsa-familia',
+    'emp-conta-energia',
+    'emp-bpc-loas'
+  ], {
+    errorMap: () => ({ message: 'Selecione um tipo de contrato' })
+  }),
+  
+  valorTotal: z.number()
+    .min(1000, 'Valor mínimo é R$ 1.000,00')
+    .max(1000000, 'Valor máximo é R$ 1.000.000,00'),
+  
+  parcelas: z.number()
+    .int('Número de parcelas deve ser um número inteiro')
+    .min(6, 'Mínimo de 6 parcelas')
+    .max(96, 'Máximo de 96 parcelas'),
+  
+  taxa: z.number()
+    .min(0.1, 'Taxa deve ser maior que 0.1%')
+    .max(15, 'Taxa deve ser menor que 15%'),
+  
+  dataEmprestimo: z.string()
+    .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Data deve estar no formato DD/MM/AAAA')
+    .refine((date) => {
+      const [day, month, year] = date.split('/').map(Number);
+      const inputDate = new Date(year, month - 1, day);
+      const today = new Date();
+      
+      // Normalizar as datas para comparar apenas dia/mês/ano (sem horário)
+      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const inputNormalized = new Date(year, month - 1, day);
+      const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+      
+      return inputNormalized >= todayNormalized && inputNormalized <= maxDate;
+    }, 'Data deve ser hoje ou no futuro (máximo 1 ano)'),
+  
+  observacoes: z.string().optional()
 });
 
 export type ContratoFormData = z.infer<typeof contratoSchema>;
