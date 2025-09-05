@@ -60,6 +60,30 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Configuração Adicional Necessária
+
+### Configuração do Storage do Supabase para Upload de PDFs
+
+Para que o recurso de upload de PDFs funcione corretamente, é necessário configurar o storage do Supabase:
+
+1. Acesse o painel do Supabase
+2. Crie um bucket chamado `contratos-pdfs`
+3. Configure as permissões apropriadas para o bucket
+4. Habilite URLs públicas para permitir download dos PDFs
+
+Instruções detalhadas estão disponíveis no arquivo [SUPABASE_STORAGE_SETUP.md](./SUPABASE_STORAGE_SETUP.md)
+
+### Migração do Banco de Dados
+
+Se estiver atualizando de uma versão anterior, execute o script de migração [PDF_FIELDS_MIGRATION.sql](./PDF_FIELDS_MIGRATION.sql) para adicionar os campos necessários à tabela de contratos.
+
+## Arquivos de Documentação e Suporte
+
+- [SUPABASE_STORAGE_SETUP.md](./SUPABASE_STORAGE_SETUP.md) - Instruções detalhadas para configurar o storage do Supabase
+- [PDF_FIELDS_MIGRATION.sql](./PDF_FIELDS_MIGRATION.sql) - Script SQL para adicionar campos de PDF à tabela de contratos
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Guia de solução de problemas comuns
+- [StorageSetupInstructions.tsx](./src/components/StorageSetupInstructions.tsx) - Componente React com instruções visuais
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/82f7500a-8cff-45b3-b667-54a4b67751cc) and click on Share -> Publish.
