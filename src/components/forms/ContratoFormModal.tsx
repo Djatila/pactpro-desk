@@ -130,6 +130,31 @@ export function ContratoFormModal({
       if (initialData.tipoContrato) {
         setValue('tipoContrato', initialData.tipoContrato);
       }
+      // Garantir que todos os campos sejam preenchidos corretamente
+      if (initialData.valorTotal !== undefined) {
+        setValue('valorTotal', initialData.valorTotal);
+      }
+      if (initialData.dataEmprestimo) {
+        setValue('dataEmprestimo', initialData.dataEmprestimo);
+      }
+      if (initialData.parcelas !== undefined) {
+        setValue('parcelas', initialData.parcelas);
+      }
+      if (initialData.taxa !== undefined) {
+        setValue('taxa', initialData.taxa);
+      }
+      if (initialData.primeiroVencimento) {
+        setValue('primeiroVencimento', initialData.primeiroVencimento);
+      }
+      if (initialData.valorOperacao !== undefined) {
+        setValue('valorOperacao', initialData.valorOperacao);
+      }
+      if (initialData.valorSolicitado !== undefined) {
+        setValue('valorSolicitado', initialData.valorSolicitado);
+      }
+      if (initialData.valorPrestacao !== undefined) {
+        setValue('valorPrestacao', initialData.valorPrestacao);
+      }
     } else if (mode === 'create') {
       // Reset para formulário vazio quando for criação
       const dataAtual = getDataAtual();
@@ -376,7 +401,7 @@ export function ContratoFormModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dataEmprestimo">Data do Empréstimo *</Label>
+              <Label htmlFor="dataEmprestimo">Data Base *</Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input

@@ -96,7 +96,27 @@ export default function Contratos() {
 
   const openEditModal = (contrato: any) => {
     console.log('Abrindo modal de edição para contrato:', contrato);
-    setEditingContrato(contrato);
+    // Garantir que todos os campos necessários estejam presentes
+    const contratoParaEdicao = {
+      id: contrato.id,
+      clienteId: contrato.clienteId,
+      bancoId: contrato.bancoId,
+      tipoContrato: contrato.tipoContrato,
+      valorTotal: contrato.valorTotal,
+      dataEmprestimo: contrato.dataEmprestimo,
+      parcelas: contrato.parcelas,
+      taxa: contrato.taxa,
+      observacoes: contrato.observacoes,
+      // Novos campos
+      primeiroVencimento: contrato.primeiroVencimento,
+      valorOperacao: contrato.valorOperacao,
+      valorSolicitado: contrato.valorSolicitado,
+      valorPrestacao: contrato.valorPrestacao,
+      // Campos para PDF
+      pdfUrl: contrato.pdfUrl,
+      pdfName: contrato.pdfName
+    };
+    setEditingContrato(contratoParaEdicao);
     setIsModalOpen(true);
   };
 
