@@ -209,6 +209,35 @@ export interface Database {
           updated_at?: string;
         };
       };
+      tipos_contrato: {
+        Row: {
+          id: string;
+          user_id: string;
+          value: string;
+          label: string;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          value: string;
+          label: string;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          value?: string;
+          label?: string;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -242,3 +271,7 @@ export type ContratoUpdate = Database['public']['Tables']['contratos']['Update']
 export type Configuracao = Database['public']['Tables']['configuracoes']['Row'];
 export type ConfiguracaoInsert = Database['public']['Tables']['configuracoes']['Insert'];
 export type ConfiguracaoUpdate = Database['public']['Tables']['configuracoes']['Update'];
+
+export type TipoContrato = Database['public']['Tables']['tipos_contrato']['Row'];
+export type TipoContratoInsert = Database['public']['Tables']['tipos_contrato']['Insert'];
+export type TipoContratoUpdate = Database['public']['Tables']['tipos_contrato']['Update'];

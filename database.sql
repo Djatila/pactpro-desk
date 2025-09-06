@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.clientes (
     endereco TEXT NOT NULL,
     data_nascimento TEXT NOT NULL,
     observacoes TEXT,
-    status TEXT DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo')),
+    status TEXT DEFAULT 'inativo' CHECK (status IN ('ativo', 'inativo')),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

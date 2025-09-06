@@ -57,14 +57,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         console.log('🔍 Iniciando verificação de sessão...');
         
-        // Timeout de segurança para evitar tela branca
-        const safetyTimeout = setTimeout(() => {
-          if (isMounted) {
-            console.warn('⚠️ Timeout de segurança ativado - liberando tela');
-            setIsLoading(false);
-            setInitialCheckDone(true);
-          }
-        }, 3000); // 3 segundos máximo
+        // Timeout aumentado para PCs com conectividade mais lenta (15 segundos)
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Timeout na verificação de sessão'));
+          }, 15000); // Aumentado de 10s para 15s para maior tolerância
+        });
 
         // Verificação inicial rápida - tentar localStorage primeiro
         if (!initialCheckDone) {
@@ -76,7 +74,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
               setUser(parsedUser);
               setIsLoading(false);
               setInitialCheckDone(true);
-              clearTimeout(safetyTimeout);
+              // Verificar sessão em background após um curto delay
+              setTimeout(() => {
+                if (isMounted) {
+                  getSession();
+                }
+              }, 500);
               return;
             }
           } catch (error) {
@@ -90,35 +93,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.warn('⚠️ Supabase não configurado. Funcionando em modo offline.');
           if (isMounted) {
             setIsLoading(false);
-            clearTimeout(safetyTimeout);
           }
           return;
         }
 
         console.log('🔄 Verificando sessão no Supabase...');
         
-        // Verificação com timeout mais curto
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error('Timeout na verificação de sessão'));
-          }, 5000); // Reduzido para 5 segundos
-        });
-
-        const { data: { session }, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]);
+        // Tentar obter a sessão com múltiplas tentativas em caso de falha
+        let sessionResult;
+        let attempt = 0;
+        const maxAttempts = 3;
+        
+        while (attempt < maxAttempts) {
+          try {
+            const sessionPromise = supabase.auth.getSession();
+            sessionResult = await Promise.race([
+              sessionPromise,
+              timeoutPromise
+            ]);
+            break; // Se sucesso, sair do loop
+          } catch (error) {
+            attempt++;
+            console.warn(`Tentativa ${attempt} de obter sessão falhou:`, error);
+            if (attempt >= maxAttempts) {
+              throw error; // Se todas as tentativas falharem, lançar o erro
+            }
+            // Aguardar um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+        }
 
         clearTimeout(timeoutId);
-        clearTimeout(safetyTimeout);
+        
+        if (!sessionResult) {
+          throw new Error('Não foi possível obter a sessão');
+        }
 
-        if (sessionError) {
-          console.error('❌ Erro na sessão:', sessionError);
-          if (isMounted) {
-            setError('Erro ao verificar sessão');
-            setIsLoading(false);
-          }
+        const { data: { session }, error } = sessionResult as any;
+        
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          setError(error.message);
           return;
         }
 

@@ -124,13 +124,44 @@ export const bancoSchema = z.object({
 
 // Schema para Contrato
 export const contratoSchema = z.object({
-  clienteId: z.string().min(1, 'Cliente é obrigatório'),
-  bancoId: z.string().min(1, 'Banco é obrigatório'),
-  tipoContrato: z.string().min(1, 'Tipo de contrato é obrigatório'),
-  dataEmprestimo: z.string().min(1, 'Data do empréstimo é obrigatória'),
-  valorTotal: z.number().min(0.01, 'Valor total deve ser maior que zero'),
-  parcelas: z.number().min(1, 'Número de parcelas deve ser maior que zero'),
-  taxa: z.number().min(0, 'Taxa não pode ser negativa'),
+  clienteId: z.string()
+    .min(1, 'Selecione um cliente'),
+  
+  bancoId: z.string()
+    .min(1, 'Selecione um banco'),
+  
+  tipoContrato: z.string({
+    errorMap: () => ({ message: 'Selecione um tipo de contrato' })
+  }).min(1, 'Selecione um tipo de contrato'),
+  
+  valorTotal: z.number()
+    .min(1000, 'Valor mínimo é R$ 1.000,00')
+    .max(1000000, 'Valor máximo é R$ 1.000.000,00'),
+  
+  parcelas: z.number()
+    .int('Número de parcelas deve ser um número inteiro')
+    .min(6, 'Mínimo de 6 parcelas')
+    .max(96, 'Máximo de 96 parcelas'),
+  
+  taxa: z.number()
+    .min(0.1, 'Taxa deve ser maior que 0.1%')
+    .max(15, 'Taxa deve ser menor que 15%'),
+  
+  dataEmprestimo: z.string()
+    .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Data deve estar no formato DD/MM/AAAA')
+    .refine((date) => {
+      const [day, month, year] = date.split('/').map(Number);
+      const inputDate = new Date(year, month - 1, day);
+      const today = new Date();
+      
+      // Normalizar as datas para comparar apenas dia/mês/ano (sem horário)
+      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const inputNormalized = new Date(year, month - 1, day);
+      const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+      
+      return inputNormalized >= todayNormalized && inputNormalized <= maxDate;
+    }, 'Data deve ser hoje ou no futuro (máximo 1 ano)'),
+  
   observacoes: z.string().optional(),
   // Novos campos
   primeiroVencimento: z.string().min(1, 'Primeiro vencimento é obrigatório'),
@@ -144,17 +175,11 @@ export type ContratoFormData = z.infer<typeof contratoSchema>;
 // Removemos os campos de PDF do tipo pois eles são gerenciados separadamente
 // Tipos TypeScript derivados dos schemas
 
-// Função para obter tipos de contrato do localStorage ou padrão
+// Função para obter tipos de contrato do contexto de dados ou padrão
+// Esta função deve ser usada em conjunto com o DataContext
 export const getTiposContrato = () => {
-  const savedTipos = localStorage.getItem('tiposContrato');
-  if (savedTipos) {
-    try {
-      const tipos = JSON.parse(savedTipos);
-      return tipos.map((tipo: any) => ({ value: tipo.value, label: tipo.label }));
-    } catch {
-      // Se houver erro no parse, usar tipos padrão
-    }
-  }
+  // Esta função agora é apenas um fallback para manter compatibilidade
+  // O componente ContratoFormModal agora carrega os tipos diretamente do contexto
   
   // Tipos padrão
   return [

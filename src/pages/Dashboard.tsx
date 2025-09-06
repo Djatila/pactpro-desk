@@ -51,6 +51,7 @@ export default function Dashboard() {
     }
   });
   
+  // Clientes ativos (com pelo menos um contrato ativo)
   const clientesAtivos = clientes.filter(c => c.status === 'ativo').length;
   const contratosEsteMsCount = contratosEsteMes.length;
   
@@ -155,16 +156,17 @@ export default function Dashboard() {
           <Plus className="h-4 w-4 mr-2" />
           Novo Contrato
         </Button>
+              
       </div>
-
+       
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Total de Clientes"
-          value={clientes.length.toString()}
-          description="Ativos no sistema"
+          title="Clientes Ativos"
+          value={clientesAtivos.toString()}
+          description="Com contratos ativos"
           icon={Users}
-          trend={{ value: clientesAtivos > 0 ? `${Math.round((clientesAtivos / clientes.length) * 100)}%` : "0%", isPositive: true }}
+          trend={{ value: clientes.length > 0 ? `${Math.round((clientesAtivos / clientes.length) * 100)}%` : "0%", isPositive: true }}
           gradient="primary"
         />
         

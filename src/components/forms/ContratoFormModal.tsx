@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { contratoSchema, type ContratoFormData, formatDate, formatCurrency, getTiposContrato } from '@/lib/validations';
+import { contratoSchema, type ContratoFormData, formatDate, formatCurrency } from '@/lib/validations';
 import { getProximoNumeroContrato } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
 import { ContratoPdfManager } from '@/components/ContratoPdfManager';
@@ -34,8 +34,8 @@ export function ContratoFormModal({
   mode = 'create' 
 }: ContratoFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tiposContrato, setTiposContrato] = useState(getTiposContrato());
-  const { clientes, bancos, contratos } = useData();
+  const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
+  const { clientes, bancos, contratos, loadTiposContrato } = useData();
 
   const {
     register,
@@ -72,12 +72,46 @@ export function ContratoFormModal({
     return `${dia}/${mes}/${ano}`;
   };
 
+  // Função para formatar valor monetário no padrão brasileiro (1.000,00)
+  const formatCurrencyInput = (value: number | string): string => {
+    if (value === '' || value === undefined || value === null) return '';
+    
+    // Converter para número se for string
+    const numValue = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+    
+    if (isNaN(numValue)) return '';
+    
+    // Formatar com separador de milhar e decimal
+    return numValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Função para parsear valor monetário do formato brasileiro para número
+  const parseCurrencyInput = (value: string): number => {
+    if (!value) return 0;
+    
+    // Remover pontos e substituir vírgula por ponto para parse
+    const cleanValue = value.replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleanValue) || 0;
+  };
+
   // Atualizar tipos de contrato quando o modal abrir
   useEffect(() => {
-    if (isOpen) {
-      setTiposContrato(getTiposContrato());
-    }
-  }, [isOpen]);
+    const loadTipos = async () => {
+      if (isOpen) {
+        try {
+          const tipos = await loadTiposContrato();
+          setTiposContrato(tipos);
+        } catch (error) {
+          console.error('Erro ao carregar tipos de contrato:', error);
+        }
+      }
+    };
+    
+    loadTipos();
+  }, [isOpen, loadTiposContrato]);
 
   // Reset do formulário quando initialData mudar ou modal abrir/fechar
   useEffect(() => {
@@ -96,13 +130,38 @@ export function ContratoFormModal({
       if (initialData.tipoContrato) {
         setValue('tipoContrato', initialData.tipoContrato);
       }
+      // Garantir que todos os campos sejam preenchidos corretamente
+      if (initialData.valorTotal !== undefined) {
+        setValue('valorTotal', initialData.valorTotal);
+      }
+      if (initialData.dataEmprestimo) {
+        setValue('dataEmprestimo', initialData.dataEmprestimo);
+      }
+      if (initialData.parcelas !== undefined) {
+        setValue('parcelas', initialData.parcelas);
+      }
+      if (initialData.taxa !== undefined) {
+        setValue('taxa', initialData.taxa);
+      }
+      if (initialData.primeiroVencimento) {
+        setValue('primeiroVencimento', initialData.primeiroVencimento);
+      }
+      if (initialData.valorOperacao !== undefined) {
+        setValue('valorOperacao', initialData.valorOperacao);
+      }
+      if (initialData.valorSolicitado !== undefined) {
+        setValue('valorSolicitado', initialData.valorSolicitado);
+      }
+      if (initialData.valorPrestacao !== undefined) {
+        setValue('valorPrestacao', initialData.valorPrestacao);
+      }
     } else if (mode === 'create') {
       // Reset para formulário vazio quando for criação
       const dataAtual = getDataAtual();
       reset({
         clienteId: '',
         bancoId: '',
-        tipoContrato: 'consignado-previdencia' as const,
+        tipoContrato: '',
         valorTotal: 0,
         dataEmprestimo: dataAtual, // Preencher automaticamente com a data atual
         parcelas: 0,
@@ -150,7 +209,7 @@ export function ContratoFormModal({
   };
 
   // Calcular data de término automaticamente
-  const dataTermino = calculateEndDate(dataEmprestimo, parcelas);
+  const dataTermino = calculateEndDate(primeiroVencimento, parcelas);
 
   const handleFormSubmit = async (data: ContratoFormData) => {
     console.log('Submetendo formulário de contrato', { data, mode });
@@ -211,84 +270,9 @@ export function ContratoFormModal({
     setValue('primeiroVencimento', formatted);
   };
 
-  // Função para parsear valores monetários (600000 → 6000.00)
-  const parseRawCurrency = (value: string): number => {
-    if (!value) return 0;
-    
-    // Remove tudo que não é número
-    const cleanValue = value.replace(/\D/g, '');
-    
-    // Converte o valor digitado (600000) para formato decimal (6000.00)
-    const numericValue = parseInt(cleanValue) || 0;
-    return numericValue / 100;
-  };
-
-  // Função para formatar valores no padrão brasileiro (6000.00 → 6.000,00)
-  const formatToBrazilianCurrency = (value: number): string => {
-    return value.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
-  // Função para formatar valor ao perder o foco
-  const handleCurrencyBlur = (field: keyof ContratoFormData, rawValue: string) => {
-    if (rawValue) {
-      const numericValue = parseRawCurrency(rawValue);
-      const formattedValue = formatToBrazilianCurrency(numericValue);
-      
-      // Atualiza o valor formatado no input
-      const input = document.getElementById(field) as HTMLInputElement;
-      if (input) {
-        input.value = formattedValue;
-      }
-      // Atualiza o valor no formulário como número
-      setValue(field, numericValue);
-    }
-  };
-
-  // Função para lidar com a mudança de valor (mantém apenas números durante a digitação)
-  const handleCurrencyChange = (field: keyof ContratoFormData, value: string) => {
-    // Remove tudo que não é número
-    const cleanValue = value.replace(/\D/g, '');
-    
-    // Atualiza o input para mostrar apenas números
-    const input = document.getElementById(field) as HTMLInputElement;
-    if (input) {
-      input.value = cleanValue;
-    }
-    
-    // Atualiza o valor no formulário como string temporariamente
-    setValue(field, cleanValue as any);
-  };
-
-  // Função para formatar valores ao carregar dados iniciais (sem formatação em tempo real)
-  const formatInitialCurrency = (value: number | undefined): string => {
-    if (!value || value === 0) return '';
-    // Converte para string com 2 casas decimais
-    return value.toFixed(2).replace('.', ',');
-  };
-
-  // Função para converter valor formatado brasileiro para número
-  const parseFormattedValue = (value: string | number): number => {
-    if (typeof value === 'number') return value;
-    if (!value) return 0;
-    // Remove pontos (separadores de milhares) e substitui vírgula por ponto decimal
-    return parseFloat(value.toString().replace(/\./g, '').replace(',', '.')) || 0;
-  };
-
-  // Função para formatar número para padrão brasileiro
-  const formatToBrazilian = (value: number): string => {
-    return value.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
-  // Cálculos automáticos corrigidos
-  const valorTotalNumerico = parseFormattedValue(valorTotal);
-  const valorParcela = valorTotalNumerico && parcelas ? (valorTotalNumerico / parcelas).toFixed(2) : '0';
-  const receitaEstimada = valorTotalNumerico && taxa ? (valorTotalNumerico * (taxa / 100)).toFixed(2) : '0';
+  // Cálculos automáticos
+  const valorParcela = valorTotal && parcelas ? (valorTotal / parcelas).toFixed(2) : '0';
+  const receitaEstimada = valorTotal && taxa ? (valorTotal * (taxa / 100)).toFixed(2) : '0';
   
   // Prévia da nomenclatura do contrato
   const previaContratoNome = dataEmprestimo && mode === 'create' 
@@ -399,19 +383,17 @@ export function ContratoFormModal({
               <Input
                 id="valorTotal"
                 type="text"
-                value={typeof valorTotal === 'number' ? formatToBrazilian(valorTotal) : (valorTotal || '')}
+                {...register('valorTotal', { valueAsNumber: true })}
+                value={valorTotal ? formatCurrencyInput(valorTotal) : ''}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9.,]/g, '');
-                  setValue('valorTotal', value as any);
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorTotal', value);
                 }}
                 onBlur={(e) => {
-                  const numericValue = parseFormattedValue(e.target.value);
-                  if (numericValue > 0) {
-                    // Salva como número para validação
-                    setValue('valorTotal', numericValue);
-                  }
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorTotal', value);
                 }}
-                placeholder="Ex: 15.000,50"
               />
               {errors.valorTotal && (
                 <p className="text-sm text-destructive">{errors.valorTotal.message}</p>
@@ -419,7 +401,7 @@ export function ContratoFormModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dataEmprestimo">Data do Empréstimo *</Label>
+              <Label htmlFor="dataEmprestimo">Data Base *</Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -466,23 +448,27 @@ export function ContratoFormModal({
                 id="valorParcela"
                 type="text"
                 readOnly
-                value={valorParcela ? formatToBrazilian(parseFloat(valorParcela)) : 'R$ 0,00'}
+                value={valorParcela ? formatCurrencyInput(parseFloat(valorParcela)) : '0,00'}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxa">Taxa de comissão (%) *</Label>
+              <Label htmlFor="taxa">Taxa (%) *</Label>
               <div className="relative">
                 <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   id="taxa"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
                   className="pl-9"
                   {...register('taxa', { valueAsNumber: true })}
+                  value={taxa ? formatCurrencyInput(taxa) : ''}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
+                    const value = parseCurrencyInput(e.target.value);
+                    setValue('taxa', value);
+                  }}
+                  onBlur={(e) => {
+                    // Formatar o valor ao sair do campo
+                    const value = parseCurrencyInput(e.target.value);
                     setValue('taxa', value);
                   }}
                 />
@@ -495,11 +481,11 @@ export function ContratoFormModal({
 
           {/* Receita Estimada */}
           <div className="space-y-2">
-            <Label>Minha Comissão</Label>
+            <Label>Sua Receita Estimada</Label>
             <Input
               type="text"
               readOnly
-              value={receitaEstimada ? formatToBrazilian(parseFloat(receitaEstimada)) : 'R$ 0,00'}
+              value={receitaEstimada ? formatCurrencyInput(parseFloat(receitaEstimada)) : '0,00'}
             />
           </div>
 
@@ -544,20 +530,21 @@ export function ContratoFormModal({
               <Input
                 id="valorOperacao"
                 type="text"
-                placeholder="Ex: 12.500,75"
-                value={typeof valorOperacao === 'number' ? formatToBrazilian(valorOperacao) : (valorOperacao || '')}
+                {...register('valorOperacao', { valueAsNumber: true })}
+                value={valorOperacao ? formatCurrencyInput(valorOperacao) : ''}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9.,]/g, '');
-                  setValue('valorOperacao', value as any);
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorOperacao', value);
                 }}
                 onBlur={(e) => {
-                  const numericValue = parseFormattedValue(e.target.value);
-                  if (numericValue >= 0) {
-                    setValue('valorOperacao', numericValue);
-                  }
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorOperacao', value);
                 }}
-                className="w-full"
               />
+              {errors.valorOperacao && (
+                <p className="text-sm text-destructive">{errors.valorOperacao.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -565,20 +552,21 @@ export function ContratoFormModal({
               <Input
                 id="valorSolicitado"
                 type="text"
-                placeholder="Ex: 8.750,25"
-                value={typeof valorSolicitado === 'number' ? formatToBrazilian(valorSolicitado) : (valorSolicitado || '')}
+                {...register('valorSolicitado', { valueAsNumber: true })}
+                value={valorSolicitado ? formatCurrencyInput(valorSolicitado) : ''}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9.,]/g, '');
-                  setValue('valorSolicitado', value as any);
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorSolicitado', value);
                 }}
                 onBlur={(e) => {
-                  const numericValue = parseFormattedValue(e.target.value);
-                  if (numericValue >= 0) {
-                    setValue('valorSolicitado', numericValue);
-                  }
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorSolicitado', value);
                 }}
-                className="w-full"
               />
+              {errors.valorSolicitado && (
+                <p className="text-sm text-destructive">{errors.valorSolicitado.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -586,22 +574,41 @@ export function ContratoFormModal({
               <Input
                 id="valorPrestacao"
                 type="text"
-                placeholder="Ex: 1.250,00"
-                value={typeof valorPrestacao === 'number' ? formatToBrazilian(valorPrestacao) : (valorPrestacao || '')}
+                {...register('valorPrestacao', { valueAsNumber: true })}
+                value={valorPrestacao ? formatCurrencyInput(valorPrestacao) : ''}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9.,]/g, '');
-                  setValue('valorPrestacao', value as any);
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorPrestacao', value);
                 }}
                 onBlur={(e) => {
-                  const numericValue = parseFormattedValue(e.target.value);
-                  if (numericValue >= 0) {
-                    setValue('valorPrestacao', numericValue);
-                  }
+                  // Formatar o valor ao sair do campo
+                  const value = parseCurrencyInput(e.target.value);
+                  setValue('valorPrestacao', value);
                 }}
-                className="w-full"
               />
+              {errors.valorPrestacao && (
+                <p className="text-sm text-destructive">{errors.valorPrestacao.message}</p>
+              )}
             </div>
           </div>
+
+          {/* Prévia da Nomenclatura do Contrato */}
+          {previaContratoNome && (
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center justify-center gap-3">
+                <Hash className="h-5 w-5 text-primary" />
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Nomenclatura do Contrato</p>
+                  <p className="text-lg font-bold text-primary">
+                    {previaContratoNome}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sequência global baseada no total de contratos
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Observações */}
           <div className="space-y-2">

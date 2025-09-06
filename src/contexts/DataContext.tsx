@@ -7,7 +7,9 @@ import type {
   Contrato as ContratoDB,
   ClienteInsert,
   BancoInsert,
-  ContratoInsert
+  ContratoInsert,
+  TipoContrato as TipoContratoDB,
+  TipoContratoInsert
 } from '@/lib/database.types';
 
 // Tipos para compatibilidade com a interface atual
@@ -86,6 +88,11 @@ interface DataContextType {
   uploadContratoPdf: (contratoId: string, file: File | null) => Promise<boolean>;
   // Função para download de PDF
   downloadContratoPdf: (contratoId: string) => Promise<void>;
+  // Funções para gerenciamento de tipos de contrato
+  loadTiposContrato: () => Promise<any[]>;
+  addTipoContrato: (tipo: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<boolean>;
+  updateTipoContrato: (id: string, tipo: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => Promise<boolean>;
+  deleteTipoContrato: (id: string) => Promise<boolean>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -162,22 +169,17 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
-      // Carregar bancos primeiro para garantir que o status definido manualmente seja preservado
-      await loadBancos();
-      await loadClientes();
-      await loadContratos();
-      await loadMetaAnual();
-      
-      // Versão anterior usando Promise.all estava causando condição de corrida
-      // entre loadBancos e loadContratos (que chama updateMetrics)
-      /*
+      // Carregar clientes e bancos primeiro para ter a lista completa
       await Promise.all([
         loadClientes(),
-        loadBancos(),
-        loadContratos(),
-        loadMetaAnual()
+        loadBancos()
       ]);
-      */
+      
+      // Depois carregar contratos e atualizar métricas
+      await loadContratos();
+      
+      // Por fim carregar configurações
+      await loadMetaAnual();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados');
@@ -204,7 +206,7 @@ export function DataProvider({ children }: DataProviderProps) {
         endereco: cliente.endereco,
         dataNascimento: cliente.data_nascimento,
         observacoes: cliente.observacoes,
-        status: cliente.status,
+        status: 'inativo', // Será atualizado automaticamente pelo updateMetrics
         contratos: 0 // Será calculado depois
       }));
 
@@ -325,6 +327,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const updateMetrics = (contratos: Contrato[]) => {
     console.log('📊 Atualizando métricas dos bancos e clientes...');
+    console.log('📈 Contratos carregados:', contratos.length);
     
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
@@ -336,8 +339,11 @@ export function DataProvider({ children }: DataProviderProps) {
         const hasContratosAtivos = clienteContratos.some(c => c.status === 'ativo');
         const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
         
+        console.log(`👤 Cliente ${cliente.nome}: ${clienteContratos.length} contratos, ${hasContratosAtivos ? 'ativo' : 'inativo'}`);
+        
         // Só retornar novo objeto se realmente mudou
         if (cliente.contratos !== newContratosCount || cliente.status !== newStatus) {
+          console.log(`🔄 Atualizando cliente ${cliente.nome}: ${cliente.status} -> ${newStatus}`);
           return {
             ...cliente,
             contratos: newContratosCount,
@@ -365,22 +371,17 @@ export function DataProvider({ children }: DataProviderProps) {
           currency: 'BRL'
         });
         
-        // Determinar status automaticamente:
-        // - Se tem contratos ativos, é ativo
-        // - Se não tem contratos ativos, deve ser inativo
-        let newStatus: 'ativo' | 'inativo' = 'inativo'; // Padrão é inativo
-        
-        // Se tem contratos ativos, deve ser ativo
+        // Determinar status automaticamente baseado na existência de contratos ativos
         const hasContratosAtivos = contratosBank.some(c => c.status === 'ativo');
-        if (hasContratosAtivos) {
-          newStatus = 'ativo';
-        }
-        // Se não tem contratos ativos, mantém como inativo
+        const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
+        
+        console.log(`🏦 Banco ${banco.nome}: ${contratosBank.length} contratos, ${newStatus}`);
         
         // Só retornar novo objeto se realmente mudou
         if (banco.contratos !== newContratosCount || 
             banco.volumeTotal !== newVolumeTotalFormatted ||
             banco.status !== newStatus) {
+          console.log(`🔄 Atualizando banco ${banco.nome}: ${banco.status} -> ${newStatus}`);
           return {
             ...banco,
             contratos: newContratosCount,
@@ -422,7 +423,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadClientes();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar cliente');
@@ -456,7 +459,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadClientes();
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'atualizar cliente');
@@ -480,8 +485,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadClientes();
-      await loadContratos(); // Recarregar contratos pois podem ter sido afetados
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'deletar cliente');
@@ -515,8 +521,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadBancos();
-      await loadContratos(); // Recarregar contratos para atualizar status automaticamente
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar banco');
@@ -549,8 +556,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadBancos();
-      await loadContratos(); // Recarregar contratos para atualizar métricas automaticamente
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       console.error('Erro ao atualizar banco:', error);
@@ -575,8 +583,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      // Recarregar dados para garantir sincronizacao completa
       await loadBancos();
-      await loadContratos(); // Recarregar contratos pois podem ter sido afetados
+      await loadContratos(); // Para atualizar métricas
       return true;
     } catch (error) {
       console.error('Erro ao deletar banco:', error);
@@ -624,7 +633,12 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      await loadContratos();
+      // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
+      await Promise.all([
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
+      ]);
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar contrato');
@@ -671,7 +685,12 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      await loadContratos();
+      // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
+      await Promise.all([
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
+      ]);
       return true;
     } catch (error) {
       handleSupabaseError(error, 'atualizar contrato');
@@ -1020,7 +1039,12 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      await loadContratos();
+      // Recarregar dados para garantir sincronizacao completa
+      await loadContratos(); // Carregar contratos primeiro para atualizar métricas
+      await Promise.all([
+        loadClientes(), // Atualizar clientes
+        loadBancos()    // Atualizar bancos
+      ]);
       return true;
     } catch (error) {
       console.error('Erro ao deletar contrato:', error);
@@ -1068,6 +1092,176 @@ export function DataProvider({ children }: DataProviderProps) {
     return bancos.find(banco => banco.id === id);
   };
 
+  // Funções para gerenciamento de tipos de contrato
+  const loadTiposContrato = async (): Promise<any[]> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('tipos_contrato')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('label');
+
+      if (error) {
+        console.error('Erro ao carregar tipos de contrato:', error);
+        // Se for um erro de tabela não encontrada, retornar tipos padrão
+        if (error.message.includes('relation') && error.message.includes('does not exist')) {
+          console.log('Tabela tipos_contrato não encontrada, retornando tipos padrão');
+          return [
+            { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
+            { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
+            { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', is_default: true },
+            { value: 'fgts', label: 'FGTS', is_default: true },
+            { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', is_default: true },
+            { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', is_default: true },
+            { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', is_default: true }
+          ];
+        }
+        throw error;
+      }
+      
+      // Se não houver tipos cadastrados, inserir os padrões
+      if (!data || data.length === 0) {
+        const tiposDefault = [
+          { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
+          { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
+          { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', is_default: true },
+          { value: 'fgts', label: 'FGTS', is_default: true },
+          { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', is_default: true },
+          { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', is_default: true },
+          { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', is_default: true }
+        ];
+        
+        // Inserir tipos padrão
+        const tiposInsert = tiposDefault.map(tipo => ({
+          ...tipo,
+          user_id: user.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('tipos_contrato')
+          .insert(tiposInsert);
+          
+        if (insertError) {
+          console.error('Erro ao inserir tipos de contrato padrão:', insertError);
+          // Mesmo se falhar, retornar os tipos padrão
+          return tiposDefault;
+        }
+        
+        return tiposDefault;
+      }
+      
+      return data.map(tipo => ({
+        id: tipo.id,
+        value: tipo.value,
+        label: tipo.label,
+        isDefault: tipo.is_default
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar tipos de contrato:', error);
+      // Retornar tipos padrão em caso de erro
+      return [
+        { value: 'consignado-previdencia', label: 'Consignado Previdência', isDefault: true },
+        { value: 'consignado-clt', label: 'Consignado CLT', isDefault: true },
+        { value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', isDefault: true },
+        { value: 'fgts', label: 'FGTS', isDefault: true },
+        { value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', isDefault: true },
+        { value: 'emp-conta-energia', label: 'Emp. Conta de Energia', isDefault: true },
+        { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', isDefault: true }
+      ];
+    }
+  };
+
+  const addTipoContrato = async (tipoData: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const tipoInsert: TipoContratoInsert = {
+        ...tipoData,
+        user_id: user.id
+      };
+
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .insert([tipoInsert]);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'adicionar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateTipoContrato = async (id: string, tipoData: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .update(tipoData)
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'atualizar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteTipoContrato = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Verificar se é um tipo padrão
+      const { data, error: selectError } = await supabase
+        .from('tipos_contrato')
+        .select('is_default')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (selectError) throw selectError;
+      
+      if (data?.is_default) {
+        throw new Error('Não é possível excluir tipos de contrato padrão do sistema');
+      }
+
+      const { error } = await supabase
+        .from('tipos_contrato')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      handleSupabaseError(error, 'deletar tipo de contrato');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value: DataContextType = {
     clientes,
     bancos,
@@ -1091,7 +1285,12 @@ export function DataProvider({ children }: DataProviderProps) {
     // Função para upload de PDF
     uploadContratoPdf,
     // Função para download de PDF
-    downloadContratoPdf
+    downloadContratoPdf,
+    // Funções para gerenciamento de tipos de contrato
+    loadTiposContrato,
+    addTipoContrato,
+    updateTipoContrato,
+    deleteTipoContrato
   };
 
   return (
