@@ -86,7 +86,14 @@ export function ContratoFormModal({
     if (value === '' || value === undefined || value === null) return '';
     
     // Converter para número se for string
-    const numValue = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+    let numValue: number;
+    if (typeof value === 'string') {
+      // Remover pontos e substituir vírgula por ponto para parse
+      const cleanValue = value.replace(/\./g, '').replace(',', '.');
+      numValue = parseFloat(cleanValue);
+    } else {
+      numValue = value;
+    }
     
     if (isNaN(numValue)) return '';
     
@@ -104,6 +111,21 @@ export function ContratoFormModal({
     // Remover pontos e substituir vírgula por ponto para parse
     const cleanValue = value.replace(/\./g, '').replace(',', '.');
     return parseFloat(cleanValue) || 0;
+  };
+
+  // Função para lidar com entrada de valores monetários em tempo real
+  const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: keyof ContratoFormData) => {
+    const inputValue = e.target.value;
+    
+    // Atualizar o valor no formulário mantendo exatamente como digitado
+    setValue(fieldName, inputValue as any);
+  };
+
+  // Função para formatar o valor ao sair do campo
+  const handleCurrencyBlur = (fieldName: keyof ContratoFormData, value: string | number) => {
+    // Converter o valor para número e aplicar formatação
+    const numericValue = typeof value === 'string' ? parseCurrencyInput(value) : value;
+    setValue(fieldName, numericValue);
   };
 
   // Atualizar tipos de contrato quando o modal abrir
@@ -403,17 +425,10 @@ export function ContratoFormModal({
               <Input
                 id="valorTotal"
                 type="text"
-                {...register('valorTotal', { valueAsNumber: true })}
-                value={valorTotal ? formatCurrencyInput(valorTotal) : ''}
-                onChange={(e) => {
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorTotal', value);
-                }}
-                onBlur={(e) => {
-                  // Formatar o valor ao sair do campo
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorTotal', value);
-                }}
+                {...register('valorTotal')}
+                value={typeof valorTotal === 'number' && valorTotal !== 0 ? formatCurrencyInput(valorTotal) : (valorTotal || '')}
+                onChange={(e) => handleCurrencyInput(e, 'valorTotal')}
+                onBlur={() => handleCurrencyBlur('valorTotal', valorTotal || 0)}
               />
               {errors.valorTotal && (
                 <p className="text-sm text-destructive">{errors.valorTotal.message}</p>
@@ -480,17 +495,10 @@ export function ContratoFormModal({
                   id="taxa"
                   type="text"
                   className="pl-9"
-                  {...register('taxa', { valueAsNumber: true })}
-                  value={taxa ? formatCurrencyInput(taxa) : ''}
-                  onChange={(e) => {
-                    const value = parseCurrencyInput(e.target.value);
-                    setValue('taxa', value);
-                  }}
-                  onBlur={(e) => {
-                    // Formatar o valor ao sair do campo
-                    const value = parseCurrencyInput(e.target.value);
-                    setValue('taxa', value);
-                  }}
+                  {...register('taxa')}
+                  value={typeof taxa === 'number' && taxa !== 0 ? formatCurrencyInput(taxa) : (taxa || '')}
+                  onChange={(e) => handleCurrencyInput(e, 'taxa')}
+                  onBlur={() => handleCurrencyBlur('taxa', taxa || 0)}
                 />
               </div>
               {errors.taxa && (
@@ -550,17 +558,10 @@ export function ContratoFormModal({
               <Input
                 id="valorOperacao"
                 type="text"
-                {...register('valorOperacao', { valueAsNumber: true })}
-                value={valorOperacao ? formatCurrencyInput(valorOperacao) : ''}
-                onChange={(e) => {
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorOperacao', value);
-                }}
-                onBlur={(e) => {
-                  // Formatar o valor ao sair do campo
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorOperacao', value);
-                }}
+                {...register('valorOperacao')}
+                value={typeof valorOperacao === 'number' && valorOperacao !== 0 ? formatCurrencyInput(valorOperacao) : (valorOperacao || '')}
+                onChange={(e) => handleCurrencyInput(e, 'valorOperacao')}
+                onBlur={() => handleCurrencyBlur('valorOperacao', valorOperacao || 0)}
               />
               {errors.valorOperacao && (
                 <p className="text-sm text-destructive">{errors.valorOperacao.message}</p>
@@ -572,17 +573,10 @@ export function ContratoFormModal({
               <Input
                 id="valorSolicitado"
                 type="text"
-                {...register('valorSolicitado', { valueAsNumber: true })}
-                value={valorSolicitado ? formatCurrencyInput(valorSolicitado) : ''}
-                onChange={(e) => {
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorSolicitado', value);
-                }}
-                onBlur={(e) => {
-                  // Formatar o valor ao sair do campo
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorSolicitado', value);
-                }}
+                {...register('valorSolicitado')}
+                value={typeof valorSolicitado === 'number' && valorSolicitado !== 0 ? formatCurrencyInput(valorSolicitado) : (valorSolicitado || '')}
+                onChange={(e) => handleCurrencyInput(e, 'valorSolicitado')}
+                onBlur={() => handleCurrencyBlur('valorSolicitado', valorSolicitado || 0)}
               />
               {errors.valorSolicitado && (
                 <p className="text-sm text-destructive">{errors.valorSolicitado.message}</p>
@@ -594,17 +588,10 @@ export function ContratoFormModal({
               <Input
                 id="valorPrestacao"
                 type="text"
-                {...register('valorPrestacao', { valueAsNumber: true })}
-                value={valorPrestacao ? formatCurrencyInput(valorPrestacao) : ''}
-                onChange={(e) => {
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorPrestacao', value);
-                }}
-                onBlur={(e) => {
-                  // Formatar o valor ao sair do campo
-                  const value = parseCurrencyInput(e.target.value);
-                  setValue('valorPrestacao', value);
-                }}
+                {...register('valorPrestacao')}
+                value={typeof valorPrestacao === 'number' && valorPrestacao !== 0 ? formatCurrencyInput(valorPrestacao) : (valorPrestacao || '')}
+                onChange={(e) => handleCurrencyInput(e, 'valorPrestacao')}
+                onBlur={() => handleCurrencyBlur('valorPrestacao', valorPrestacao || 0)}
               />
               {errors.valorPrestacao && (
                 <p className="text-sm text-destructive">{errors.valorPrestacao.message}</p>
