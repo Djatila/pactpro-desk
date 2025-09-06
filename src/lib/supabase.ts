@@ -10,7 +10,8 @@ const createMockClient = () => ({
     signInWithPassword: () => Promise.resolve({ data: { user: null }, error: { message: 'Supabase não configurado' } }),
     signUp: () => Promise.resolve({ data: { user: null }, error: { message: 'Supabase não configurado' } }),
     signOut: () => Promise.resolve({ error: null }),
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    getUser: () => Promise.resolve({ data: { user: null }, error: null })
   },
   from: () => ({
     select: () => ({
@@ -27,7 +28,13 @@ const createMockClient = () => ({
       eq: () => Promise.resolve({ data: null, error: { message: 'Supabase não configurado' } })
     }),
     upsert: () => Promise.resolve({ data: null, error: { message: 'Supabase não configurado' } })
-  })
+  }),
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ error: { message: 'Storage não configurado' } }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } })
+    })
+  }
 });
 
 // Verificar se as variáveis de ambiente estão configuradas
@@ -63,63 +70,64 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
     });
     
     // Teste básico de conectividade com timeout melhorado
-    const testConnectivity = () => {
-      const connectivityTest = new Promise((resolve, reject) => {
+    const testConnectivity = async () => {
+      try {
         // Aumentar timeout para PCs com conectividade mais lenta
         const timeout = setTimeout(() => {
-          reject(new Error('Timeout na conexão com Supabase'));
-        }, 8000); // Aumentado de 3s para 8s
+          throw new Error('Timeout na conexão com Supabase');
+        }, 10000); // Aumentado de 8s para 10s
         
         // Fazer múltiplas tentativas
-        const attemptConnection = async (retries = 2) => {
+        let attempt = 0;
+        const maxAttempts = 3;
+        let success = false;
+        
+        while (attempt < maxAttempts && !success) {
           try {
             await supabase.auth.getSession();
             clearTimeout(timeout);
-            resolve(true);
+            success = true;
+            console.log('✓ Supabase configurado e conectado com sucesso');
           } catch (error) {
-            if (retries > 0) {
-              console.warn(`Tentativa de conexão falhou, tentando novamente... (${retries} restantes)`);
-              setTimeout(() => attemptConnection(retries - 1), 1000);
+            attempt++;
+            console.warn(`Tentativa de conexão ${attempt} falhou:`, error);
+            if (attempt < maxAttempts) {
+              // Aguardar antes de tentar novamente
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
             } else {
               clearTimeout(timeout);
-              reject(error);
+              throw error;
             }
           }
-        };
+        }
+      } catch (error: any) {
+        console.error('❌ ERRO CRÍTICO - Supabase:', error.message);
         
-        attemptConnection();
-      });
-      
-      connectivityTest
-        .then(() => {
-          console.log('✓ Supabase configurado e conectado com sucesso');
-        })
-        .catch((error) => {
-          console.error('❌ ERRO CRÍTICO - Supabase:', error.message);
-          
-          // Detectar erros específicos e dar orientações
-          if (error.message?.includes('disabled')) {
-            console.error('🚨 SOLUÇÃO URGENTE: Autenticação por email está DESABILITADA no Supabase');
-            console.error('📋 PASSOS:');
-            console.error('   1. Acesse: https://supabase.com/dashboard');
-            console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
-            console.error('   3. Authentication → Settings');
-            console.error('   4. HABILITE: "Enable email provider"');
-            console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
-            console.error('   6. Site URL: http://localhost:8080');
-          } else if (error.message?.includes('Timeout')) {
-            console.warn('⚠️ Problema de conectividade com Supabase - PC pode ter conexão mais lenta');
-            console.warn('💡 Sugestões:');
-            console.warn('   1. Verifique sua conexão com a internet');
-            console.warn('   2. Tente recarregar a página (Ctrl+F5)');
-            console.warn('   3. Use uma rede com melhor conectividade');
-            console.warn('   4. Aplicação funcionará em modo offline se necessário');
-          }
-        });
+        // Detectar erros específicos e dar orientações
+        if (error.message?.includes('disabled')) {
+          console.error('🚨 SOLUÇÃO URGENTE: Autenticação por email está DESABILITADA no Supabase');
+          console.error('📋 PASSOS:');
+          console.error('   1. Acesse: https://supabase.com/dashboard');
+          console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
+          console.error('   3. Authentication → Settings');
+          console.error('   4. HABILITE: "Enable email provider"');
+          console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
+          console.error('   6. Site URL: http://localhost:8080');
+        } else if (error.message?.includes('Timeout')) {
+          console.warn('⚠️ Problema de conectividade com Supabase - PC pode ter conexão mais lenta');
+          console.warn('💡 Sugestões:');
+          console.warn('   1. Verifique sua conexão com a internet');
+          console.warn('   2. Tente recarregar a página (Ctrl+F5)');
+          console.warn('   3. Use uma rede com melhor conectividade');
+          console.warn('   4. Aplicação funcionará em modo offline se necessário');
+        }
+      }
     };
     
     // Executar teste de conectividade de forma assíncrona
-    setTimeout(testConnectivity, 100);
+    setTimeout(() => {
+      testConnectivity().catch(console.error);
+    }, 100);
     
     console.log('✓ Supabase cliente configurado');
   } catch (error) {

@@ -155,8 +155,11 @@ export default function Dashboard() {
           <Plus className="h-4 w-4 mr-2" />
           Novo Contrato
         </Button>
+               <p className="text-blue-100 mt-10 ml-[52rem]">
+          O Senhor é o meu Pastor e nada mim faltará.
+        </p>
       </div>
-
+       
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard

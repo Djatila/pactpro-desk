@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Calendar, AlertTriangle, TrendingUp, Building2, History, Eye } from "lucide-react";
+import { Bell, Calendar, AlertTriangle, TrendingUp, Building2, History, Eye, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -121,15 +121,31 @@ export function NotificationCenter() {
     switch (tipo) {
       case 'SELIC':
       case 'CDI':
-      case 'IPCA':
+      case 'POUPANCA':
         return <TrendingUp className="h-4 w-4 text-blue-500" />;
+      case 'IPCA':
+      case 'IGPM':
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
       case 'CAMBIO':
         return <Building2 className="h-4 w-4 text-green-500" />;
+      case 'PIB':
+      case 'DESEMPREGO':
+        return <BarChart3 className="h-4 w-4 text-purple-500" />;
       case 'NOTICIA':
-        return <Bell className="h-4 w-4 text-orange-500" />;
+        return <Bell className="h-4 w-4 text-gray-500" />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
+  };
+
+  const getCorVariacao = (variacao?: number) => {
+    if (!variacao) return 'text-gray-600';
+    return variacao >= 0 ? 'text-green-600' : 'text-red-600';
+  };
+
+  const getIconeVariacao = (variacao?: number) => {
+    if (!variacao) return null;
+    return variacao >= 0 ? '📈' : '📉';
   };
 
   const getIcon = (type: string) => {

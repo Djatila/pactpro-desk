@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getTipoContratoLabel } from "@/lib/validations";
@@ -13,7 +14,9 @@ import {
   Percent,
   Hash,
   CreditCard,
-  Tag
+  Tag,
+  File,
+  Download
 } from "lucide-react";
 
 interface Contrato {
@@ -31,6 +34,14 @@ interface Contrato {
   receitaAgente: string;
   status: 'ativo' | 'pendente' | 'finalizado';
   observacoes?: string;
+  // Novos campos (tornados opcionais para compatibilidade com contratos antigos)
+  primeiroVencimento?: string;
+  valorOperacao?: number;
+  valorSolicitado?: number;
+  valorPrestacao?: number;
+  // Campos para PDF (tornados opcionais)
+  pdfUrl?: string;
+  pdfName?: string;
 }
 
 interface ContratoDetailModalProps {
@@ -43,60 +54,13 @@ interface ContratoDetailModalProps {
 export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos }: ContratoDetailModalProps) {
   if (!contrato) return null;
 
-  // Função para calcular data de término do contrato
-  const calculateEndDate = (startDate: string, numParcelas: number): string => {
-    if (!startDate || !numParcelas || numParcelas <= 0) return '';
-    
-    try {
-      // Converter data DD/MM/AAAA para objeto Date
-      const dateParts = startDate.split('/');
-      if (dateParts.length !== 3) return '';
-      
-      const day = parseInt(dateParts[0]);
-      const month = parseInt(dateParts[1]) - 1; // JavaScript usa meses 0-11
-      const year = parseInt(dateParts[2]);
-      
-      if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
-      
-      const startDateObj = new Date(year, month, day);
-      
-      // Adicionar número de meses (parcelas são mensais)
-      const endDateObj = new Date(startDateObj);
-      endDateObj.setMonth(endDateObj.getMonth() + numParcelas);
-      
-      // Formatar de volta para DD/MM/AAAA
-      const endDay = endDateObj.getDate().toString().padStart(2, '0');
-      const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
-      const endYear = endDateObj.getFullYear();
-      
-      return `${endDay}/${endMonth}/${endYear}`;
-    } catch (error) {
-      return '';
-    }
-  };
-
-  const dataTermino = calculateEndDate(contrato.dataEmprestimo, contrato.parcelas);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ativo": return "bg-success text-success-foreground";
-      case "pendente": return "bg-warning text-warning-foreground";
-      case "finalizado": return "bg-info text-info-foreground";
-      default: return "";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "ativo": return "Ativo";
-      case "pendente": return "Pendente";
-      case "finalizado": return "Finalizado";
-      default: return status;
-    }
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('ContratoDetailModal onOpenChange:', open);
+      if (!open) {
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -255,6 +219,18 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">1° Vencimento</p>
+                      <p className="font-medium">{contrato.primeiroVencimento || 'Não informado'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {dataTermino && (
                 <Card>
                   <CardContent className="p-4">
@@ -270,12 +246,88 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
               )}
             </div>
 
+            {/* Valores financeiros adicionais */}
+            <div className="grid gap-3 md:grid-cols-3">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Valor da Operação</p>
+                      <p className="font-medium">
+                        {contrato.valorOperacao !== undefined 
+                          ? `R$ ${contrato.valorOperacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Valor Solicitado</p>
+                      <p className="font-medium">
+                        {contrato.valorSolicitado !== undefined
+                          ? `R$ ${contrato.valorSolicitado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Valor da Prestação</p>
+                      <p className="font-medium">
+                        {contrato.valorPrestacao !== undefined
+                          ? `R$ ${contrato.valorPrestacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {contrato.observacoes && (
               <Card>
                 <CardContent className="p-3">
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Observações</p>
                     <p className="text-sm leading-relaxed">{contrato.observacoes}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Documento PDF */}
+            {contrato.pdfUrl && (
+              <Card className="border-success">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <File className="h-5 w-5 text-success" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Documento Anexado</p>
+                        <p className="font-medium text-success">{contrato.pdfName || 'Documento PDF'}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open(contrato.pdfUrl, '_blank')}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Baixar
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

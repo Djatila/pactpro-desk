@@ -24,7 +24,8 @@ import {
   Eye,
   Download,
   AlertTriangle,
-  Settings
+  Settings,
+  File
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,7 +39,7 @@ export default function Contratos() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
   const [searchParams] = useSearchParams();
-  const { contratos, bancos, addContrato, updateContrato, deleteContrato } = useData();
+  const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf } = useData();
 
   // Filtro por banco via URL
   const bancoFilter = searchParams.get('banco');
@@ -51,21 +52,40 @@ export default function Contratos() {
   }, [bancoFiltrado]);
 
   const handleCreateContrato = async (data: ContratoFormData) => {
+    console.log('Criando contrato:', data);
     try {
-      addContrato(data as any);
-      toast.success('Contrato cadastrado com sucesso!');
+      console.log('Tentando criar contrato com dados:', data);
+      // Remover campos de PDF dos dados antes de enviar
+      const { pdfUrl, pdfName, ...formDataWithoutPdf } = data as any;
+      const result = await addContrato(formDataWithoutPdf as any);
+      if (result) {
+        // Não fechamos o modal automaticamente para permitir upload de PDF
+        // O fechamento será feito pelo usuário quando clicar no botão "Concluir"
+        toast.success('Contrato cadastrado com sucesso!');
+      } else {
+        toast.error('Erro ao cadastrar contrato');
+      }
     } catch (error) {
+      console.error('Erro ao cadastrar contrato:', error);
       toast.error('Erro ao cadastrar contrato');
       throw error;
     }
   };
 
   const handleEditContrato = async (data: ContratoFormData) => {
+    console.log('Editando contrato:', data);
     try {
       if (editingContrato) {
-        updateContrato(editingContrato.id, data as any);
-        setEditingContrato(null);
-        toast.success('Contrato atualizado com sucesso!');
+        // Remover campos de PDF dos dados antes de enviar
+        const { pdfUrl, pdfName, ...formDataWithoutPdf } = data as any;
+        const result = await updateContrato(editingContrato.id, formDataWithoutPdf as any);
+        if (result) {
+          // Não fechamos o modal automaticamente para permitir upload de PDF
+          // O fechamento será feito pelo usuário quando clicar no botão "Concluir"
+          toast.success('Contrato atualizado com sucesso!');
+        } else {
+          toast.error('Erro ao atualizar contrato');
+        }
       }
     } catch (error) {
       toast.error('Erro ao atualizar contrato');
@@ -74,26 +94,38 @@ export default function Contratos() {
   };
 
   const openEditModal = (contrato: any) => {
+    console.log('Abrindo modal de edição para contrato:', contrato);
     setEditingContrato(contrato);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
+    console.log('Fechando modal de contrato via closeModal');
+    setIsModalOpen(false);
+    setEditingContrato(null);
+  };
+
+  // Nova função para fechar o modal explicitamente
+  const handleModalClose = () => {
+    console.log('Fechando modal de contrato via handleModalClose');
     setIsModalOpen(false);
     setEditingContrato(null);
   };
 
   const handleViewContrato = (contrato: any) => {
+    console.log('Abrindo modal de visualização para contrato:', contrato);
     setViewingContrato(contrato);
     setIsDetailModalOpen(true);
   };
 
   const handleDeleteContrato = (contrato: any) => {
+    console.log('Abrindo modal de confirmação de exclusão para contrato:', contrato);
     setDeletingContrato(contrato);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDeleteContrato = async () => {
+    console.log('Confirmando exclusão de contrato:', deletingContrato);
     try {
       if (deletingContrato) {
         deleteContrato(deletingContrato.id);
@@ -107,9 +139,14 @@ export default function Contratos() {
   };
 
   const handleDownloadContrato = (contrato: any) => {
-    // Simular download de contrato
-    toast.info(`Download do ${formatContratoNome(contratos, contrato)} iniciado...`);
-    // Aqui você pode implementar a lógica real de download/geração de PDF
+    console.log('Fazendo download de contrato:', contrato);
+    if (contrato.pdfUrl) {
+      // Se tiver PDF anexado, fazer download diretamente
+      window.open(contrato.pdfUrl, '_blank');
+    } else {
+      // Se não tiver PDF, mostrar mensagem
+      toast.info('Este contrato não possui documento PDF anexado.');
+    }
   };
 
   const handleTiposChange = (tipos: any[]) => {
@@ -369,51 +406,59 @@ export default function Contratos() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleViewContrato(contrato)}
-                    title="Visualizar detalhes"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => openEditModal(contrato)}
-                    title="Editar contrato"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleDownloadContrato(contrato)}
-                    title="Baixar contrato"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={contrato.status === 'ativo' 
-                      ? "text-warning hover:text-warning" 
-                      : "text-destructive hover:text-destructive"
-                    }
-                    onClick={() => handleDeleteContrato(contrato)}
-                    title={contrato.status === 'ativo' 
-                      ? "Contrato ativo - Clique para forçar exclusão" 
-                      : "Excluir contrato"
-                    }
-                  >
-                    {contrato.status === 'ativo' ? (
-                      <AlertTriangle className="h-4 w-4" />
-                    ) : (
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => handleViewContrato(contrato)}
+                      title="Visualizar detalhes"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => {
+                        console.log('Botão de edição clicado para contrato:', contrato);
+                        openEditModal(contrato);
+                      }}
+                      title="Editar contrato"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteContrato(contrato)}
+                      title="Excluir contrato"
+                    >
                       <Trash2 className="h-4 w-4" />
-                    )}
+                    </Button>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDownloadContrato(contrato)}
+                    disabled={!contrato.pdfUrl}
+                    className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    PDF
                   </Button>
                 </div>
+              
+                {/* PDF Status Indicator */}
+                {contrato.pdfUrl && (
+                  <div className="flex items-center gap-2 text-sm text-success mt-2">
+                    <File className="h-4 w-4" />
+                    <span>Documento PDF anexado</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -437,7 +482,7 @@ export default function Contratos() {
       {/* Modal para criar/editar contratos */}
       <ContratoFormModal
         isOpen={isModalOpen}
-        onClose={closeModal}
+        onClose={handleModalClose}
         onSubmit={editingContrato ? handleEditContrato : handleCreateContrato}
         initialData={editingContrato}
         mode={editingContrato ? 'edit' : 'create'}
@@ -447,6 +492,7 @@ export default function Contratos() {
       <ContratoDetailModal
         isOpen={isDetailModalOpen}
         onClose={() => {
+          console.log('Fechando modal de detalhes');
           setIsDetailModalOpen(false);
           setViewingContrato(null);
         }}
@@ -458,6 +504,7 @@ export default function Contratos() {
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
+          console.log('Fechando modal de confirmação de exclusão');
           setIsDeleteModalOpen(false);
           setDeletingContrato(null);
         }}
@@ -477,7 +524,10 @@ export default function Contratos() {
       {/* Modal do Gerenciador de Tipos de Contrato */}
       <TipoContratoManagerModal
         isOpen={isTipoManagerModalOpen}
-        onClose={() => setIsTipoManagerModalOpen(false)}
+        onClose={() => {
+          console.log('Fechando modal do gerenciador de tipos de contrato');
+          setIsTipoManagerModalOpen(false);
+        }}
         onTiposChange={handleTiposChange}
       />
     </div>
