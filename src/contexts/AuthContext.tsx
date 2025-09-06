@@ -55,6 +55,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const getSession = async () => {
       try {
+        console.log('🔍 Iniciando verificação de sessão...');
+        
         // Timeout aumentado para PCs com conectividade mais lenta (15 segundos)
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
@@ -95,6 +97,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        console.log('🔄 Verificando sessão no Supabase...');
+        
         // Tentar obter a sessão com múltiplas tentativas em caso de falha
         let sessionResult;
         let attempt = 0;

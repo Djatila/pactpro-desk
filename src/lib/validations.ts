@@ -181,6 +181,8 @@ export const getTiposContrato = () => {
   // Esta função agora é apenas um fallback para manter compatibilidade
   // O componente ContratoFormModal agora carrega os tipos diretamente do contexto
   
+  console.log('Usando função fallback getTiposContrato');
+  
   // Tipos padrão
   return [
     { value: 'consignado-previdencia', label: 'Consignado Previdência' },
@@ -206,9 +208,14 @@ export const tiposContrato = [
 
 // Função para obter o label do tipo de contrato
 export const getTipoContratoLabel = (value: string): string => {
+  console.log('Obtendo label para tipo de contrato:', value);
   const tipos = getTiposContrato();
+  console.log('Tipos disponíveis:', tipos);
   const tipo = tipos.find(t => t.value === value);
-  return tipo ? tipo.label : value;
+  console.log('Tipo encontrado:', tipo);
+  const result = tipo ? tipo.label : value;
+  console.log('Resultado:', result);
+  return result;
 };
 
 // Função para formatar CPF

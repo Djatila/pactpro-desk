@@ -40,7 +40,24 @@ export default function Contratos() {
   const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf, loadTiposContrato } = useData();
+  // Estado para os tipos de contrato
   const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
+
+  // Carregar tipos de contrato quando o componente montar
+  useEffect(() => {
+    const loadTipos = async () => {
+      try {
+        console.log('Carregando tipos de contrato na página de contratos...');
+        const tipos = await loadTiposContrato();
+        console.log('Tipos de contrato carregados na página:', tipos);
+        setTiposContrato(tipos);
+      } catch (error) {
+        console.error('Erro ao carregar tipos de contrato na página:', error);
+      }
+    };
+    
+    loadTipos();
+  }, [loadTiposContrato]);
 
   // Filtro por banco via URL
   const bancoFilter = searchParams.get('banco');
@@ -175,7 +192,10 @@ export default function Contratos() {
     console.log('Tipos de contrato atualizados');
     // Recarregar os tipos de contrato
     const novosTipos = await loadTiposContrato();
+    console.log('Novos tipos carregados:', novosTipos);
     setTiposContrato(novosTipos);
+    // Chamar refreshData para atualizar todos os dados
+    await refreshData();
   };
 
   const filteredContratos = contratos.filter(contrato => {

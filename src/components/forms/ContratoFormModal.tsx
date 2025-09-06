@@ -120,8 +120,9 @@ export function ContratoFormModal({
         }
         
         try {
+          console.log('Carregando tipos de contrato...');
           const tipos = await loadTiposContrato();
-          console.log('Tipos carregados no useEffect:', tipos);
+          console.log('Tipos de contrato carregados:', tipos);
           setTiposContrato(tipos);
         } catch (error) {
           console.error('Erro ao carregar tipos de contrato:', error);

@@ -205,25 +205,26 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
               <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="font-medium mb-1">Arraste e solte o PDF aqui</p>
               <p className="text-sm text-muted-foreground mb-3">ou</p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
               >
-                {isUploading ? 'Anexando...' : 'Selecionar Arquivo'}
+                <Upload className="h-4 w-4 mr-2" />
+                Selecionar Arquivo
               </Button>
               <p className="text-xs text-muted-foreground mt-2">
-                Formatos suportados: PDF (máx. 10MB)
+                PDF máximo 10MB
               </p>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePdfChange}
-                accept=".pdf,application/pdf"
-                className="hidden"
-                disabled={isUploading}
-              />
             </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePdfChange}
+              accept=".pdf,application/pdf"
+              className="hidden"
+              disabled={isUploading}
+            />
           </CardContent>
         </Card>
       )}
