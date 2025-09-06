@@ -60,7 +60,15 @@ CREATE TABLE IF NOT EXISTS public.contratos (
     observacoes TEXT,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Novos campos adicionados
+    primeiro_vencimento TEXT NOT NULL,
+    valor_operacao DECIMAL(15,2) NOT NULL DEFAULT 0,
+    valor_solicitado DECIMAL(15,2) NOT NULL DEFAULT 0,
+    valor_prestacao DECIMAL(15,2) NOT NULL DEFAULT 0,
+    -- Campo para armazenar informações do PDF
+    pdf_url TEXT,
+    pdf_name TEXT
 );
 
 -- 5. Criar tabela de configurações
@@ -200,3 +208,36 @@ CREATE INDEX IF NOT EXISTS idx_contratos_user_id ON public.contratos(user_id);
 CREATE INDEX IF NOT EXISTS idx_contratos_cliente_id ON public.contratos(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_contratos_banco_id ON public.contratos(banco_id);
 CREATE INDEX IF NOT EXISTS idx_configuracoes_user_id ON public.configuracoes(user_id);
+
+-- Configuração do Storage para PDFs dos contratos
+-- Execute estas instruções no SQL Editor do Supabase após criar as tabelas
+
+/*
+-- Criar bucket para armazenamento de PDFs
+insert into storage.buckets (id, name, public)
+values ('contratos-pdfs', 'contratos-pdfs', true);
+
+-- Política para permitir upload de PDFs
+create policy "Usuários podem fazer upload de PDFs"
+on storage.objects for insert
+to authenticated
+with check (bucket_id = 'contratos-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Política para permitir leitura de PDFs
+create policy "PDFs são publicamente acessíveis"
+on storage.objects for select
+to authenticated
+with check (bucket_id = 'contratos-pdfs');
+
+-- Política para permitir atualização de PDFs
+create policy "Usuários podem atualizar seus PDFs"
+on storage.objects for update
+to authenticated
+using (bucket_id = 'contratos-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Política para permitir exclusão de PDFs
+create policy "Usuários podem excluir seus PDFs"
+on storage.objects for delete
+to authenticated
+using (bucket_id = 'contratos-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
+*/

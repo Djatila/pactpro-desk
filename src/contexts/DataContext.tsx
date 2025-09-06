@@ -52,6 +52,14 @@ interface Contrato {
   receitaAgente: string;
   status: 'ativo' | 'pendente' | 'finalizado';
   observacoes?: string;
+  // Novos campos
+  primeiroVencimento: string;
+  valorOperacao: number;
+  valorSolicitado: number;
+  valorPrestacao: number;
+  // Campos para PDF
+  pdfUrl?: string;
+  pdfName?: string;
 }
 
 interface DataContextType {
@@ -74,6 +82,10 @@ interface DataContextType {
   getClienteById: (id: string) => Cliente | undefined;
   getBancoById: (id: string) => Banco | undefined;
   refreshData: () => Promise<void>;
+  // Função para upload de PDF
+  uploadContratoPdf: (contratoId: string, file: File | null) => Promise<boolean>;
+  // Função para download de PDF
+  downloadContratoPdf: (contratoId: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -150,12 +162,22 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      // Carregar bancos primeiro para garantir que o status definido manualmente seja preservado
+      await loadBancos();
+      await loadClientes();
+      await loadContratos();
+      await loadMetaAnual();
+      
+      // Versão anterior usando Promise.all estava causando condição de corrida
+      // entre loadBancos e loadContratos (que chama updateMetrics)
+      /*
       await Promise.all([
         loadClientes(),
         loadBancos(),
         loadContratos(),
         loadMetaAnual()
       ]);
+      */
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados');
@@ -210,7 +232,7 @@ export function DataProvider({ children }: DataProviderProps) {
         contato: banco.contato,
         telefoneContato: banco.telefone_contato,
         observacoes: banco.observacoes,
-        status: 'inativo', // Será atualizado automaticamente pelo updateMetrics
+        status: banco.status, // Usar o status do banco diretamente do banco de dados
         contratos: 0, // Será calculado depois
         volumeTotal: 'R$ 0' // Será calculado depois
       }));
@@ -237,7 +259,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
       const contratosFormatted: Contrato[] = (data || []).map(contrato => {
         const valorParcela = contrato.valor_total / contrato.parcelas;
-        const receitaAgente = (contrato.valor_total * (contrato.taxa / 100)) * 0.3; // 30% da receita
+        const receitaAgente = contrato.valor_total * (contrato.taxa / 100);
 
         return {
           id: contrato.id,
@@ -251,15 +273,25 @@ export function DataProvider({ children }: DataProviderProps) {
           parcelas: contrato.parcelas,
           valorParcela: valorParcela.toLocaleString('pt-BR', {
             style: 'currency',
-            currency: 'BRL'
+            currency: 'BRL',
+            minimumFractionDigits: 2
           }),
           taxa: contrato.taxa,
           receitaAgente: receitaAgente.toLocaleString('pt-BR', {
             style: 'currency',
-            currency: 'BRL'
+            currency: 'BRL',
+            minimumFractionDigits: 2
           }),
           status: contrato.status,
-          observacoes: contrato.observacoes
+          observacoes: contrato.observacoes,
+          // Novos campos
+          primeiroVencimento: contrato.primeiro_vencimento,
+          valorOperacao: contrato.valor_operacao,
+          valorSolicitado: contrato.valor_solicitado,
+          valorPrestacao: contrato.valor_prestacao,
+          // Campos para PDF
+          pdfUrl: contrato.pdf_url,
+          pdfName: contrato.pdf_name
         };
       });
 
@@ -297,17 +329,25 @@ export function DataProvider({ children }: DataProviderProps) {
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
       const updatedClientes = prev.map(cliente => {
-        const clienteContratos = contratos.filter(c => c.clienteId === cliente.id).length;
+        const clienteContratos = contratos.filter(c => c.clienteId === cliente.id);
+        const newContratosCount = clienteContratos.length;
+        
+        // Determinar status automaticamente baseado na existência de contratos ativos
+        const hasContratosAtivos = clienteContratos.some(c => c.status === 'ativo');
+        const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
         
         // Só retornar novo objeto se realmente mudou
-        if (cliente.contratos !== clienteContratos) {
+        if (cliente.contratos !== newContratosCount || cliente.status !== newStatus) {
           return {
             ...cliente,
-            contratos: clienteContratos
+            contratos: newContratosCount,
+            status: newStatus
           };
         }
         return cliente; // Manter referência se não mudou
       });
+      
+      
       
       // Só atualizar se algo realmente mudou
       const hasChanges = updatedClientes.some((cliente, index) => cliente !== prev[index]);
@@ -325,8 +365,17 @@ export function DataProvider({ children }: DataProviderProps) {
           currency: 'BRL'
         });
         
-        // Determinar status automaticamente baseado na existência de contratos
-        const newStatus: 'ativo' | 'inativo' = newContratosCount > 0 ? 'ativo' : 'inativo';
+        // Determinar status automaticamente:
+        // - Se tem contratos ativos, é ativo
+        // - Se não tem contratos ativos, deve ser inativo
+        let newStatus: 'ativo' | 'inativo' = 'inativo'; // Padrão é inativo
+        
+        // Se tem contratos ativos, deve ser ativo
+        const hasContratosAtivos = contratosBank.some(c => c.status === 'ativo');
+        if (hasContratosAtivos) {
+          newStatus = 'ativo';
+        }
+        // Se não tem contratos ativos, mantém como inativo
         
         // Só retornar novo objeto se realmente mudou
         if (banco.contratos !== newContratosCount || 
@@ -501,6 +550,7 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       await loadBancos();
+      await loadContratos(); // Recarregar contratos para atualizar métricas automaticamente
       return true;
     } catch (error) {
       console.error('Erro ao atualizar banco:', error);
@@ -538,22 +588,34 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>): Promise<boolean> => {
+    console.log('Adicionando contrato:', contratoData);
     if (!user) return false;
     
     setIsLoading(true);
     setError(null);
+    
+    console.log(' Tentando criar contrato com dados:', contratoData);
 
     try {
+      // Remover campos de PDF dos dados do contrato antes de enviar para o banco
+      const { pdfUrl, pdfName, ...contratoDataWithoutPdf } = contratoData as any;
+
       const contratoInsert: ContratoInsert = {
-        cliente_id: contratoData.clienteId,
-        banco_id: contratoData.bancoId,
-        tipo_contrato: contratoData.tipoContrato,
-        data_emprestimo: contratoData.dataEmprestimo,
-        valor_total: contratoData.valorTotal,
-        parcelas: contratoData.parcelas,
-        taxa: contratoData.taxa,
-        observacoes: contratoData.observacoes,
-        user_id: user.id
+        cliente_id: contratoDataWithoutPdf.clienteId,
+        banco_id: contratoDataWithoutPdf.bancoId,
+        tipo_contrato: contratoDataWithoutPdf.tipoContrato,
+        data_emprestimo: contratoDataWithoutPdf.dataEmprestimo,
+        valor_total: contratoDataWithoutPdf.valorTotal,
+        parcelas: contratoDataWithoutPdf.parcelas,
+        taxa: contratoDataWithoutPdf.taxa,
+        observacoes: contratoDataWithoutPdf.observacoes,
+        user_id: user.id,
+        // Novos campos
+        primeiro_vencimento: contratoDataWithoutPdf.primeiroVencimento || '',
+        valor_operacao: contratoDataWithoutPdf.valorOperacao || 0,
+        valor_solicitado: contratoDataWithoutPdf.valorSolicitado || 0,
+        valor_prestacao: contratoDataWithoutPdf.valorPrestacao || 0
+        // Removemos os campos de PDF pois eles não devem ser definidos na criação
       };
 
       const { error } = await supabase
@@ -565,8 +627,7 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadContratos();
       return true;
     } catch (error) {
-      console.error('Erro ao adicionar contrato:', error);
-      setError('Erro ao adicionar contrato');
+      handleSupabaseError(error, 'adicionar contrato');
       return false;
     } finally {
       setIsLoading(false);
@@ -574,22 +635,34 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const updateContrato = async (id: string, contratoData: Partial<Contrato>): Promise<boolean> => {
+    console.log('Atualizando contrato:', id, contratoData);
     if (!user) return false;
     
     setIsLoading(true);
     setError(null);
 
     try {
+      // Remover campos de PDF dos dados do contrato antes de enviar para o banco
+      const { pdfUrl, pdfName, ...contratoDataWithoutPdf } = contratoData as any;
+      
       const updateData: any = {};
-      if (contratoData.clienteId) updateData.cliente_id = contratoData.clienteId;
-      if (contratoData.bancoId) updateData.banco_id = contratoData.bancoId;
-      if (contratoData.tipoContrato) updateData.tipo_contrato = contratoData.tipoContrato;
-      if (contratoData.dataEmprestimo) updateData.data_emprestimo = contratoData.dataEmprestimo;
-      if (contratoData.valorTotal !== undefined) updateData.valor_total = contratoData.valorTotal;
-      if (contratoData.parcelas !== undefined) updateData.parcelas = contratoData.parcelas;
-      if (contratoData.taxa !== undefined) updateData.taxa = contratoData.taxa;
-      if (contratoData.status) updateData.status = contratoData.status;
-      if (contratoData.observacoes !== undefined) updateData.observacoes = contratoData.observacoes;
+      if (contratoDataWithoutPdf.clienteId) updateData.cliente_id = contratoDataWithoutPdf.clienteId;
+      if (contratoDataWithoutPdf.bancoId) updateData.banco_id = contratoDataWithoutPdf.bancoId;
+      if (contratoDataWithoutPdf.tipoContrato) updateData.tipo_contrato = contratoDataWithoutPdf.tipoContrato;
+      if (contratoDataWithoutPdf.dataEmprestimo) updateData.data_emprestimo = contratoDataWithoutPdf.dataEmprestimo;
+      if (contratoDataWithoutPdf.valorTotal !== undefined) updateData.valor_total = contratoDataWithoutPdf.valorTotal;
+      if (contratoDataWithoutPdf.parcelas !== undefined) updateData.parcelas = contratoDataWithoutPdf.parcelas;
+      if (contratoDataWithoutPdf.taxa !== undefined) updateData.taxa = contratoDataWithoutPdf.taxa;
+      if (contratoDataWithoutPdf.status) updateData.status = contratoDataWithoutPdf.status;
+      if (contratoDataWithoutPdf.observacoes !== undefined) updateData.observacoes = contratoDataWithoutPdf.observacoes;
+      // Novos campos
+      if (contratoDataWithoutPdf.primeiroVencimento !== undefined) updateData.primeiro_vencimento = contratoDataWithoutPdf.primeiroVencimento;
+      if (contratoDataWithoutPdf.valorOperacao !== undefined) updateData.valor_operacao = contratoDataWithoutPdf.valorOperacao;
+      if (contratoDataWithoutPdf.valorSolicitado !== undefined) updateData.valor_solicitado = contratoDataWithoutPdf.valorSolicitado;
+      if (contratoDataWithoutPdf.valorPrestacao !== undefined) updateData.valor_prestacao = contratoDataWithoutPdf.valorPrestacao;
+      // Campos para PDF (não atualizamos esses campos aqui, eles são atualizados separadamente)
+      // if (contratoDataWithoutPdf.pdfUrl !== undefined) updateData.pdf_url = contratoDataWithoutPdf.pdfUrl;
+      // if (contratoDataWithoutPdf.pdfName !== undefined) updateData.pdf_name = contratoDataWithoutPdf.pdfName;
 
       const { error } = await supabase
         .from('contratos')
@@ -601,9 +674,333 @@ export function DataProvider({ children }: DataProviderProps) {
       await loadContratos();
       return true;
     } catch (error) {
-      console.error('Erro ao atualizar contrato:', error);
-      setError('Erro ao atualizar contrato');
+      handleSupabaseError(error, 'atualizar contrato');
       return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para verificar se o bucket existe
+  const checkStorageBucket = async (): Promise<boolean> => {
+    try {
+      if (!supabase.storage) {
+        throw new Error('Serviço de storage não disponível');
+      }
+      
+      // Verificar se o usuário está autenticado
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Erro ao verificar sessão:', sessionError);
+        throw new Error('Erro de autenticação. Por favor, faça login novamente.');
+      }
+      
+      if (!session) {
+        console.error('Usuário não autenticado');
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+      
+      console.log('Usuário autenticado:', session.user.id);
+      
+      console.log('Listando buckets disponíveis...');
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error('Erro ao listar buckets:', error);
+        // Verificar se é um erro de permissão
+        if (error.message?.includes('permission')) {
+          throw new Error('Permissão negada. Verifique as políticas de acesso ao bucket no painel do Supabase.');
+        }
+        return false;
+      }
+      
+      console.log('Buckets encontrados:', buckets);
+      
+      // Verificar se temos buckets
+      if (!buckets) {
+        console.log('Nenhum bucket retornado');
+        return false;
+      }
+      
+      // Verificar se é um array
+      if (!Array.isArray(buckets)) {
+        console.log('Buckets não é um array:', typeof buckets, buckets);
+        return false;
+      }
+      
+      const bucketExists = buckets.some(bucket => {
+        console.log(`Verificando bucket: ${bucket.name} (id: ${bucket.id})`);
+        return bucket.name === 'contratos-pdfs';
+      });
+      
+      console.log('Bucket "contratos-pdfs" encontrado:', bucketExists);
+      
+      if (!bucketExists) {
+        console.log('Lista de todos os buckets disponíveis:');
+        buckets.forEach(bucket => {
+          console.log(`- ${bucket.name} (id: ${bucket.id}, public: ${bucket.public})`);
+        });
+      }
+      
+      return bucketExists;
+    } catch (error) {
+      console.error('Erro ao verificar bucket:', error);
+      return false;
+    }
+  };
+
+  // Função para upload de PDF do contrato
+  const uploadContratoPdf = async (contratoId: string, file: File | null): Promise<boolean> => {
+    console.log('Iniciando upload de PDF para contrato:', contratoId, file?.name);
+    
+    // Verificar autenticação do usuário
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Erro ao verificar sessão:', sessionError);
+      setError('Erro de autenticação. Por favor, faça login novamente.');
+      return false;
+    }
+    
+    if (!session) {
+      console.error('Usuário não autenticado');
+      setError('Usuário não autenticado. Faça login novamente.');
+      return false;
+    }
+    
+    console.log('Usuário autenticado:', session.user);
+    
+    if (!user) {
+      console.error('Contexto de usuário não disponível');
+      setError('Contexto de usuário não disponível. Faça login novamente.');
+      return false;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Verificar se o serviço de storage está disponível
+      if (!supabase.storage) {
+        throw new Error('Serviço de storage não disponível. Verifique a configuração do Supabase.');
+      }
+
+      if (file) {
+        // Fazer upload do arquivo para o storage do Supabase
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${contratoId}.${fileExt}`;
+        
+        console.log('Tentando upload do arquivo:', fileName);
+        
+        // Verificar se o bucket existe
+        console.log('Verificando existência do bucket...');
+        const bucketExists = await checkStorageBucket();
+        console.log('Resultado da verificação do bucket:', bucketExists);
+        
+        if (!bucketExists) {
+          // Tentativa alternativa de verificar o bucket
+          console.log('Tentando verificar bucket com método alternativo...');
+          try {
+            const { data: testData, error: testError } = await supabase.storage.from('contratos-pdfs').list('', { limit: 1 });
+            if (testError) {
+              console.error('Erro ao testar acesso ao bucket:', testError);
+              if (testError.message?.includes('Bucket not found')) {
+                throw new Error('Bucket "contratos-pdfs" não encontrado. Por favor, configure o storage no painel do Supabase conforme instruções em SUPABASE_STORAGE_SETUP.md.');
+              } else {
+                throw new Error(`Erro ao acessar bucket: ${testError.message}`);
+              }
+            } else {
+              console.log('Teste de acesso ao bucket bem-sucedido');
+            }
+          } catch (testError) {
+            console.error('Erro no teste alternativo:', testError);
+            throw new Error('Bucket "contratos-pdfs" não encontrado. Por favor, configure o storage no painel do Supabase conforme instruções em SUPABASE_STORAGE_SETUP.md.');
+          }
+        }
+        
+        const { error: uploadError } = await supabase.storage
+          .from('contratos-pdfs')
+          .upload(fileName, file, {
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Erro no upload do PDF:', uploadError);
+          // Tratar erros específicos
+          if (uploadError.message?.includes('Bucket not found')) {
+            throw new Error('Bucket "contratos-pdfs" não encontrado. Por favor, configure o storage no painel do Supabase conforme instruções em SUPABASE_STORAGE_SETUP.md.');
+          } else if (uploadError.message?.includes('Permission denied')) {
+            throw new Error('Permissão negada. Verifique as políticas de acesso ao bucket no painel do Supabase.');
+          } else if (uploadError.message?.includes('Requested entity too large')) {
+            throw new Error('Arquivo muito grande. O tamanho máximo permitido é 10MB.');
+          }
+          throw uploadError;
+        }
+
+        // Obter URL pública do arquivo
+        console.log('Obtendo URL pública para:', fileName);
+        const { data: urlData } = supabase.storage
+          .from('contratos-pdfs')
+          .getPublicUrl(fileName);
+
+        console.log('URL pública obtida:', urlData);
+
+        // Verificar se a URL foi obtida corretamente
+        if (!urlData?.publicUrl) {
+          throw new Error('Não foi possível obter a URL pública do arquivo.');
+        }
+
+        // Atualizar contrato com informações do PDF
+        console.log('Atualizando contrato com informações do PDF...');
+        const { error: updateError } = await supabase
+          .from('contratos')
+          .update({
+            pdf_url: urlData.publicUrl,
+            pdf_name: file.name
+          })
+          .eq('id', contratoId);
+
+        if (updateError) {
+          console.error('Erro ao atualizar contrato com PDF:', updateError);
+          throw updateError;
+        }
+        
+        console.log('Contrato atualizado com sucesso');
+      } else {
+        // Remover PDF do contrato
+        console.log('Removendo PDF do contrato...');
+        const { error: updateError } = await supabase
+          .from('contratos')
+          .update({
+            pdf_url: null,
+            pdf_name: null
+          })
+          .eq('id', contratoId);
+
+        if (updateError) {
+          console.error('Erro ao remover PDF do contrato:', updateError);
+          throw updateError;
+        }
+        
+        console.log('PDF removido com sucesso');
+      }
+
+      // Em vez de recarregar todos os contratos, vamos atualizar apenas o contrato específico
+      // await loadContratos();
+      // Atualizar apenas o contrato modificado
+      await updateSingleContrato(contratoId);
+      return true;
+    } catch (error: any) {
+      console.error('Erro detalhado no upload de PDF:', error);
+      handleSupabaseError(error, file ? 'fazer upload do PDF do contrato' : 'remover PDF do contrato');
+      
+      // Mostrar mensagem mais específica de erro
+      if (error.message) {
+        setError(error.message);
+      }
+      
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para atualizar um único contrato após mudanças no PDF
+  const updateSingleContrato = async (contratoId: string) => {
+    console.log('Atualizando contrato individual:', contratoId);
+    try {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          clientes!contratos_cliente_id_fkey(nome),
+          bancos!contratos_banco_id_fkey(nome)
+        `)
+        .eq('id', contratoId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const contratoFormatted: Contrato = {
+          id: data.id,
+          clienteId: data.cliente_id,
+          clienteNome: (data.clientes as any)?.nome || 'Cliente não encontrado',
+          bancoId: data.banco_id,
+          bancoNome: (data.bancos as any)?.nome || 'Banco não encontrado',
+          tipoContrato: data.tipo_contrato,
+          dataEmprestimo: data.data_emprestimo,
+          valorTotal: data.valor_total,
+          parcelas: data.parcelas,
+          valorParcela: (data.valor_total / data.parcelas).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+          }),
+          taxa: data.taxa,
+          receitaAgente: (data.valor_total * (data.taxa / 100)).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+          }),
+          status: data.status,
+          observacoes: data.observacoes,
+          // Novos campos
+          primeiroVencimento: data.primeiro_vencimento,
+          valorOperacao: data.valor_operacao,
+          valorSolicitado: data.valor_solicitado,
+          valorPrestacao: data.valor_prestacao,
+          // Campos para PDF
+          pdfUrl: data.pdf_url,
+          pdfName: data.pdf_name
+        };
+
+        // Atualizar o contrato específico no estado
+        setContratos(prev => {
+          // Verificar se o contrato já existe no estado
+          const contratoExists = prev.some(c => c.id === contratoId);
+          
+          if (contratoExists) {
+            // Se existe, atualizar apenas esse contrato
+            console.log('Atualizando contrato existente no estado');
+            return prev.map(c => c.id === contratoId ? contratoFormatted : c);
+          } else {
+            // Se não existe, adicionar o novo contrato
+            console.log('Adicionando novo contrato ao estado');
+            return [...prev, contratoFormatted];
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar contrato individual:', error);
+      // Se falhar, recarregar todos os contratos
+      await loadContratos();
+    }
+  };
+
+  // Função para download do PDF do contrato
+  const downloadContratoPdf = async (contratoId: string): Promise<void> => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const contrato = contratos.find(c => c.id === contratoId);
+      if (!contrato || !contrato.pdfUrl) {
+        throw new Error('PDF não encontrado para este contrato');
+      }
+
+      // Criar link para download
+      const link = document.createElement('a');
+      link.href = contrato.pdfUrl;
+      link.target = '_blank';
+      link.download = contrato.pdfName || `contrato-${contratoId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      handleSupabaseError(error, 'fazer download do PDF do contrato');
     } finally {
       setIsLoading(false);
     }
@@ -690,11 +1087,37 @@ export function DataProvider({ children }: DataProviderProps) {
     updateMetaAnual,
     getClienteById,
     getBancoById,
-    refreshData
+    refreshData,
+    // Função para upload de PDF
+    uploadContratoPdf,
+    // Função para download de PDF
+    downloadContratoPdf
   };
 
   return (
-    <DataContext.Provider value={value}>
+    <DataContext.Provider value={{
+      clientes,
+      bancos,
+      contratos,
+      metaAnual,
+      isLoading,
+      error,
+      addCliente,
+      updateCliente,
+      deleteCliente,
+      addBanco,
+      updateBanco,
+      deleteBanco,
+      addContrato,
+      updateContrato,
+      deleteContrato,
+      updateMetaAnual,
+      getClienteById,
+      getBancoById,
+      refreshData,
+      uploadContratoPdf,
+      downloadContratoPdf
+    }}>
       {children}
     </DataContext.Provider>
   );

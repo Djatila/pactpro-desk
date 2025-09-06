@@ -55,12 +55,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const getSession = async () => {
       try {
-        // Timeout aumentado para PCs com conectividade mais lenta (10 segundos)
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error('Timeout na verificação de sessão'));
-          }, 10000); // Aumentado de 5s para 10s
-        });
+        console.log('🔍 Iniciando verificação de sessão...');
+        
+        // Timeout de segurança para evitar tela branca
+        const safetyTimeout = setTimeout(() => {
+          if (isMounted) {
+            console.warn('⚠️ Timeout de segurança ativado - liberando tela');
+            setIsLoading(false);
+            setInitialCheckDone(true);
+          }
+        }, 3000); // 3 segundos máximo
 
         // Verificação inicial rápida - tentar localStorage primeiro
         if (!initialCheckDone) {
@@ -68,15 +72,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const storedUser = localStorage.getItem('maiacred_user');
             if (storedUser) {
               const parsedUser = JSON.parse(storedUser);
+              console.log('✅ Usuário encontrado no localStorage:', parsedUser.email);
               setUser(parsedUser);
               setIsLoading(false);
               setInitialCheckDone(true);
-              // Verificar sessão em background
-              setTimeout(() => getSession(), 100);
+              clearTimeout(safetyTimeout);
               return;
             }
           } catch (error) {
-            console.warn('Erro ao ler localStorage:', error);
+            console.warn('⚠️ Erro ao ler localStorage:', error);
           }
           setInitialCheckDone(true);
         }
@@ -86,110 +90,112 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.warn('⚠️ Supabase não configurado. Funcionando em modo offline.');
           if (isMounted) {
             setIsLoading(false);
+            clearTimeout(safetyTimeout);
           }
           return;
         }
 
+        console.log('🔄 Verificando sessão no Supabase...');
+        
+        // Verificação com timeout mais curto
         const sessionPromise = supabase.auth.getSession();
-        const { data: { session }, error } = await Promise.race([
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Timeout na verificação de sessão'));
+          }, 5000); // Reduzido para 5 segundos
+        });
+
+        const { data: { session }, error: sessionError } = await Promise.race([
           sessionPromise,
           timeoutPromise
-        ]) as any;
-        
+        ]);
+
         clearTimeout(timeoutId);
-        
-        if (error) {
-          console.error('Erro ao obter sessão:', error);
-          setError(error.message);
+        clearTimeout(safetyTimeout);
+
+        if (sessionError) {
+          console.error('❌ Erro na sessão:', sessionError);
+          if (isMounted) {
+            setError('Erro ao verificar sessão');
+            setIsLoading(false);
+          }
           return;
         }
 
         if (session?.user && isMounted) {
-          await loadUserProfile(session.user.id);
-        } else if (isMounted) {
-          // Se não há sessão ativa, limpar dados locais
-          localStorage.removeItem('maiacred_user');
-          setUser(null);
-        }
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        console.error('Erro ao verificar sessão:', error);
-        
-        if (error.message === 'Timeout na verificação de sessão') {
-          console.warn('⚠️ Timeout na verificação de autenticação.');
-          console.warn('💻 PC detectado com conectividade mais lenta que celular');
-          console.warn('💡 Sugestões:');
-          console.warn('   1. Verifique sua conexão Wi-Fi/Ethernet');
-          console.warn('   2. Tente recarregar a página (Ctrl+F5)');
-          console.warn('   3. Feche outras abas que possam estar consumindo banda');
-          console.warn('   4. A aplicação continuará funcionando em modo offline');
+          console.log('✅ Sessão ativa encontrada:', session.user.email);
           
-          // Não definir erro para não bloquear a interface
-          setError(null);
-          
-          // Tentar carregar dados do localStorage como fallback
+          // Buscar perfil do usuário
           try {
-            const storedUser = localStorage.getItem('maiacred_user');
-            if (storedUser && isMounted) {
-              const parsedUser = JSON.parse(storedUser);
-              console.log('📋 Usando dados salvos localmente como fallback');
-              setUser(parsedUser);
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileError) {
+              console.warn('⚠️ Erro ao buscar perfil:', profileError);
+              // Criar usuário básico mesmo sem perfil
+              const basicUser: User = {
+                id: session.user.id,
+                nome: session.user.email?.split('@')[0] || 'Usuário',
+                email: session.user.email || '',
+                cargo: 'Usuário'
+              };
+              setUser(basicUser);
+              localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
+            } else {
+              const userData: User = {
+                id: profile.id,
+                nome: profile.nome || session.user.email?.split('@')[0] || 'Usuário',
+                email: profile.email || session.user.email || '',
+                cargo: profile.cargo || 'Usuário',
+                avatar: profile.avatar
+              };
+              setUser(userData);
+              localStorage.setItem('maiacred_user', JSON.stringify(userData));
+              console.log('✅ Perfil carregado:', userData.nome);
             }
-          } catch (storageError) {
-            console.warn('Erro ao carregar fallback do localStorage:', storageError);
+          } catch (profileError) {
+            console.error('❌ Erro ao buscar perfil:', profileError);
+            // Fallback para usuário básico
+            const basicUser: User = {
+              id: session.user.id,
+              nome: session.user.email?.split('@')[0] || 'Usuário',
+              email: session.user.email || '',
+              cargo: 'Usuário'
+            };
+            setUser(basicUser);
+            localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
           }
         } else {
-          console.warn('Continuando em modo offline...');
-          setError(null); // Não mostrar erro se for problema de configuração
+          console.log('ℹ️ Nenhuma sessão ativa encontrada');
+          localStorage.removeItem('maiacred_user');
         }
-      } finally {
+
         if (isMounted) {
           setIsLoading(false);
+        }
+        
+      } catch (error) {
+        console.error('❌ Erro crítico na verificação de sessão:', error);
+        if (isMounted) {
+          setError('Erro na verificação de autenticação');
+          setIsLoading(false);
+          // Limpar dados em caso de erro
+          localStorage.removeItem('maiacred_user');
         }
       }
     };
 
+    // Executar verificação
     getSession();
 
-    // Escutar mudanças na autenticação apenas se Supabase estiver configurado
-    let subscription: any = null;
-    
-    try {
-      if (supabase && typeof supabase.auth?.onAuthStateChange === 'function') {
-        const { data } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            if (!isMounted) return;
-
-            console.log('Auth state mudou:', event, session?.user?.id);
-            
-            if (event === 'SIGNED_IN' && session?.user) {
-              try {
-                await loadUserProfile(session.user.id);
-              } catch (profileError) {
-                console.error('Erro ao carregar perfil no state change:', profileError);
-              }
-            } else if (event === 'SIGNED_OUT') {
-              console.log('🔓 Evento SIGNED_OUT detectado - limpando dados');
-              setUser(null);
-              localStorage.removeItem('maiacred_user');
-            }
-            
-            setIsLoading(false);
-          }
-        );
-        subscription = data.subscription;
-      }
-    } catch (error) {
-      console.error('Erro ao configurar listener de autenticação:', error);
-    }
-
+    // Cleanup
     return () => {
       isMounted = false;
       if (timeoutId) {
         clearTimeout(timeoutId);
-      }
-      if (subscription?.unsubscribe) {
-        subscription.unsubscribe();
       }
     };
   }, []);

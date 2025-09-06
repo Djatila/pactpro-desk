@@ -1,121 +1,124 @@
-# Troubleshooting - Problemas de Autenticação
+# Guia de Solução de Problemas - MaiaCred
 
-## Problema: "Verificando autenticação" demora muito para carregar
+Este documento contém soluções para problemas comuns que podem ocorrer no sistema MaiaCred.
 
-### Solução Rápida 🚀
-**Se `maiacred.vercel.app` demora mas `maiacred.vercel.app/login` abre rápido:**
+## Problemas com Upload de PDF
 
-Isso foi corrigido! O problema estava no roteamento. Agora:
-- ✅ **Rota `/`**: Redirecionamento inteligente e rápido
-- ✅ **Cache Local**: Primeira verificação instantânea usando localStorage
-- ✅ **Timeout Otimizado**: Verificação em background sem travar a interface
+### Erro: "Erro ao anexar PDF. Tente novamente."
 
-### Como Funciona Agora
-1. **Acesso a `/`**: Verificação instantânea no localStorage
-2. **Usuário Logado**: Redirecionamento imediato para `/dashboard`
-3. **Usuário Não Logado**: Redirecionamento imediato para `/login`
-4. **Verificação Supabase**: Acontece em background sem bloquear
+**Causas possíveis:**
+1. Bucket "contratos-pdfs" não configurado no Supabase
+2. Permissões de acesso ao bucket não configuradas
+3. Problemas de conectividade com o serviço de storage
+4. Arquivo PDF muito grande (limite de 10MB)
+5. Formato de arquivo inválido
 
-### Possíveis Causas e Soluções
+**Soluções:**
+1. Verifique se o bucket "contratos-pdfs" existe no painel do Supabase
+2. Siga as instruções em [SUPABASE_STORAGE_SETUP.md](./SUPABASE_STORAGE_SETUP.md) para configurar o storage
+3. Verifique as políticas de acesso ao bucket
+4. Tente com um arquivo PDF menor
+5. Confirme que o arquivo é um PDF válido
 
-#### 1. **Variáveis de Ambiente não configuradas**
-**Sintoma**: A aplicação fica carregando indefinidamente ou exibe avisos no console sobre Supabase não configurado.
+### Erro: "Bucket not found"
 
-**Solução**:
-1. Crie um arquivo `.env` na raiz do projeto baseado no `.env.example`:
-```bash
-cp .env.example .env
-```
+**Solução:**
+1. Acesse o painel do Supabase
+2. Vá para Storage > Buckets
+3. Crie um novo bucket com o nome "contratos-pdfs"
+4. Habilite "Public URLs" para permitir download
+5. Configure as políticas de acesso conforme instruções
 
-2. Configure as variáveis com os valores corretos do seu projeto Supabase:
-```env
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_anon_key_aqui
-```
+## Problemas de Conectividade
 
-3. Reinicie o servidor de desenvolvimento:
-```bash
-npm run dev
-```
+### Erro: "Timeout na verificação de sessão"
 
-#### 2. **Problemas de Conectividade com Supabase**
-**Sintoma**: Timeout na verificação de autenticação, especialmente em conexões lentas.
+**Causas possíveis:**
+1. Conexão lenta com os servidores do Supabase
+2. Problemas de rede local
+3. Configuração incorreta do Supabase
 
-**Melhorias Implementadas**:
-- ✅ Timeout de 5 segundos para verificação de sessão
-- ✅ Timeout de 3 segundos para carregamento de perfil
-- ✅ Botão de recarregar página após 10 segundos de carregamento
-- ✅ Indicadores visuais de status de conexão
+**Soluções:**
+1. Verifique sua conexão com a internet
+2. Tente recarregar a página (Ctrl+F5)
+3. Feche outras abas que possam estar consumindo banda
+4. Verifique as variáveis de ambiente no arquivo .env
+5. Confirme que o projeto Supabase está ativo
 
-**Ações Manuais**:
-1. Verifique sua conexão com internet
-2. Teste o acesso direto ao Supabase em: `https://seu-projeto.supabase.co`
-3. Se necessário, clique em "Recarregar Página" que aparece após 10 segundos
+### Erro: "Supabase não configurado"
 
-#### 3. **Problemas com Tabela de Perfis**
-**Sintoma**: Login funciona mas não carrega o perfil do usuário.
+**Solução:**
+1. Verifique se o arquivo .env existe na raiz do projeto
+2. Confirme que as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão definidas
+3. Verifique se os valores estão corretos no painel do Supabase
+4. Reinicie o servidor de desenvolvimento
 
-**Verificações**:
-1. Confirme que a tabela `profiles` existe no Supabase
-2. Verifique se o trigger para criação automática de perfil está funcionando
-3. Verifique as permissões RLS (Row Level Security) da tabela
+## Problemas com Autenticação
 
-**SQL para verificar/criar a tabela**:
-```sql
--- Verificar se a tabela existe
-SELECT * FROM profiles LIMIT 1;
+### Erro: "Email ou senha incorretos"
 
--- Se não existir, criar a tabela
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE,
-  nome TEXT NOT NULL,
-  email TEXT NOT NULL,
-  cargo TEXT NOT NULL,
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  PRIMARY KEY (id)
-);
-```
+**Soluções:**
+1. Verifique se o email e senha estão corretos
+2. Confirme que o usuário está cadastrado
+3. Verifique se o provedor de email está habilitado no Supabase
 
-#### 4. **Cache do Navegador**
-**Sintoma**: Problemas persistem mesmo após correções.
+### Erro: "Email não confirmado"
 
-**Solução**:
-1. Limpe o cache do navegador (Ctrl+F5 ou Cmd+Shift+R)
-2. Abra o Devtools → Application → Storage → Clear storage
-3. Ou use navegação privada/incógnita para testar
+**Solução:**
+1. Acesse o painel do Supabase
+2. Vá para Authentication > Users
+3. Encontre o usuário e marque como confirmado
+4. Ou desabilite "Confirm email" nas configurações de autenticação
 
-### Monitoramento em Tempo Real
+## Problemas com Contratos
 
-#### Console do Navegador (F12)
-Observe estas mensagens:
-- ✅ `"✓ Supabase configurado e conectado com sucesso"`
-- ⚠️ `"⚠️ Supabase não configurado. Funcionando em modo offline"`
-- ❌ `"Erro ao obter sessão"` ou `"Timeout na verificação de sessão"`
+### Contrato não aparece na lista
 
-#### Indicadores Visuais
-- 🔄 **Carregando**: Spinner com "Verificando autenticação..."
-- ⚠️ **Problemas**: Banner amarelo com detalhes do erro
-- 🔄 **Timeout**: Botão "Recarregar Página" após 10 segundos
-- 📡 **Offline**: Ícone de WiFi desconectado
+**Causas possíveis:**
+1. Problemas de sincronização com o banco de dados
+2. Filtros aplicados na lista
+3. Problemas de permissão
 
-### Modo de Desenvolvimento vs Produção
+**Soluções:**
+1. Tente atualizar a página
+2. Verifique os filtros aplicados
+3. Confirme que o usuário tem permissão para acessar o contrato
 
-#### Desenvolvimento Local
-- Timeouts mais longos para debugging
-- Logs detalhados no console
-- Modo offline funcional para desenvolvimento sem Supabase
+### Erro ao salvar contrato
 
-#### Produção (Vercel)
-- Verifique se as variáveis de ambiente estão configuradas no Vercel
-- Vá em: Vercel Dashboard → Seu Projeto → Settings → Environment Variables
-- Adicione `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`
-- Faça um novo deploy após adicionar as variáveis
+**Causas possíveis:**
+1. Campos obrigatórios não preenchidos
+2. Problemas de conectividade
+3. Erros de validação
 
-### Contato e Suporte
+**Soluções:**
+1. Verifique se todos os campos obrigatórios estão preenchidos
+2. Confirme sua conexão com a internet
+3. Verifique mensagens de erro específicas no console (F12)
 
-Se o problema persistir após seguir todos os passos:
-1. Anote os erros específicos do console do navegador
-2. Verifique o status do Supabase em: https://status.supabase.com
-3. Entre em contato com a equipe de desenvolvimento com os logs detalhados
+## Problemas com Clientes
+
+### Cliente não aparece na lista de contratos
+
+**Solução:**
+1. Verifique o status do cliente (deve estar "ativo")
+2. Confirme que o cliente foi cadastrado corretamente
+3. Tente atualizar a página
+
+## Problemas com Bancos
+
+### Status do banco oscilando
+
+**Solução:**
+1. Verifique se há contratos associados ao banco
+2. Bancos sem contratos devem ficar inativos automaticamente
+3. Bancos com contratos ativos devem ficar ativos
+
+## Suporte Adicional
+
+Se os problemas persistirem:
+
+1. Verifique o console do navegador (F12) para mensagens de erro detalhadas
+2. Confirme que todas as dependências estão instaladas corretamente
+3. Verifique o status dos serviços do Supabase
+4. Consulte a documentação oficial do Supabase para problemas específicos
