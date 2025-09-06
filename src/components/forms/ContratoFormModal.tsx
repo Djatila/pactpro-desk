@@ -102,7 +102,9 @@ export function ContratoFormModal({
     const loadTipos = async () => {
       if (isOpen) {
         try {
+          console.log('Carregando tipos de contrato...');
           const tipos = await loadTiposContrato();
+          console.log('Tipos de contrato carregados:', tipos);
           setTiposContrato(tipos);
         } catch (error) {
           console.error('Erro ao carregar tipos de contrato:', error);

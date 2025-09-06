@@ -45,6 +45,7 @@ export function TipoContratoManagerModal({
   // Carregar tipos existentes do banco de dados
   useEffect(() => {
     if (isOpen) {
+      console.log('Carregando tipos de contrato no modal de gerenciamento...');
       loadTiposFromDatabase();
     }
   }, [isOpen]);
@@ -52,7 +53,9 @@ export function TipoContratoManagerModal({
   const loadTiposFromDatabase = async () => {
     setIsLoading(true);
     try {
+      console.log('Carregando tipos de contrato do banco de dados...');
       const tiposFromDB = await loadTiposContrato();
+      console.log('Tipos de contrato carregados do banco de dados:', tiposFromDB);
       // Converter os objetos retornados para o formato esperado
       const formattedTipos = tiposFromDB.map((tipo: any) => ({
         id: tipo.id,
@@ -60,6 +63,7 @@ export function TipoContratoManagerModal({
         label: tipo.label,
         isDefault: tipo.isDefault || tipo.is_default || false
       }));
+      console.log('Tipos de contrato formatados:', formattedTipos);
       setTipos(formattedTipos);
     } catch (error) {
       console.error('Erro ao carregar tipos de contrato:', error);
@@ -96,6 +100,7 @@ export function TipoContratoManagerModal({
 
     setIsLoading(true);
     try {
+      console.log('Adicionando novo tipo de contrato:', { value, label: newTipoLabel.trim() });
       const result = await addTipoContrato({
         value,
         label: newTipoLabel.trim(),
@@ -103,6 +108,7 @@ export function TipoContratoManagerModal({
       });
 
       if (result) {
+        console.log('Tipo de contrato adicionado com sucesso, recarregando...');
         await loadTiposFromDatabase();
         setNewTipoLabel('');
         toast.success('Tipo de contrato adicionado com sucesso!');
@@ -120,6 +126,7 @@ export function TipoContratoManagerModal({
   };
 
   const handleEditTipo = (id: string) => {
+    console.log('Editando tipo de contrato:', id);
     const tipo = tipos.find(t => t.id === id);
     if (tipo) {
       setEditingId(id);
@@ -137,12 +144,14 @@ export function TipoContratoManagerModal({
 
     setIsLoading(true);
     try {
+      console.log('Salvando edição do tipo de contrato:', { id: editingId, label: editingLabel.trim() });
       const result = await updateTipoContrato(editingId, {
         label: editingLabel.trim(),
         value: generateValue(editingLabel)
       });
 
       if (result) {
+        console.log('Tipo de contrato atualizado com sucesso, recarregando...');
         await loadTiposFromDatabase();
         setEditingId(null);
         setEditingLabel('');
@@ -166,6 +175,7 @@ export function TipoContratoManagerModal({
   };
 
   const handleDeleteTipo = async (id: string) => {
+    console.log('Removendo tipo de contrato:', id);
     const tipo = tipos.find(t => t.id === id);
     
     if (tipo?.isDefault) {
@@ -175,9 +185,11 @@ export function TipoContratoManagerModal({
 
     setIsLoading(true);
     try {
+      console.log('Removendo tipo de contrato do banco de dados...');
       const result = await deleteTipoContrato(id);
       
       if (result) {
+        console.log('Tipo de contrato removido com sucesso, recarregando...');
         await loadTiposFromDatabase();
         toast.success('Tipo de contrato removido com sucesso!');
         // Chamar o callback para notificar que os tipos mudaram

@@ -1093,8 +1093,14 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   // Funções para gerenciamento de tipos de contrato
+  // Função para carregar tipos de contrato do banco de dados
   const loadTiposContrato = async (): Promise<any[]> => {
-    if (!user) return [];
+    if (!user) {
+      console.log('Usuário não autenticado, retornando array vazio');
+      return [];
+    }
+    
+    console.log('Carregando tipos de contrato para usuário:', user?.id);
     
     try {
       const { data, error } = await supabase
@@ -1121,8 +1127,11 @@ export function DataProvider({ children }: DataProviderProps) {
         throw error;
       }
       
+      console.log('Dados de tipos de contrato carregados:', data);
+      
       // Se não houver tipos cadastrados, inserir os padrões
       if (!data || data.length === 0) {
+        console.log('Nenhum tipo de contrato encontrado, inserindo tipos padrão');
         const tiposDefault = [
           { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
           { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
@@ -1149,9 +1158,11 @@ export function DataProvider({ children }: DataProviderProps) {
           return tiposDefault;
         }
         
+        console.log('Tipos de contrato padrão inseridos com sucesso');
         return tiposDefault;
       }
       
+      console.log('Retornando tipos de contrato do banco de dados');
       return data.map(tipo => ({
         id: tipo.id,
         value: tipo.value,
@@ -1180,6 +1191,7 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      console.log('Adicionando novo tipo de contrato:', tipoData);
       const tipoInsert: TipoContratoInsert = {
         ...tipoData,
         user_id: user.id
@@ -1191,6 +1203,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      console.log('Tipo de contrato adicionado com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar tipo de contrato');
@@ -1207,6 +1220,7 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      console.log('Atualizando tipo de contrato:', { id, tipoData });
       const { error } = await supabase
         .from('tipos_contrato')
         .update(tipoData)
@@ -1215,6 +1229,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      console.log('Tipo de contrato atualizado com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'atualizar tipo de contrato');
@@ -1231,6 +1246,7 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      console.log('Removendo tipo de contrato:', id);
       // Verificar se é um tipo padrão
       const { data, error: selectError } = await supabase
         .from('tipos_contrato')
@@ -1253,6 +1269,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
+      console.log('Tipo de contrato removido com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'deletar tipo de contrato');
@@ -1294,29 +1311,7 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   return (
-    <DataContext.Provider value={{
-      clientes,
-      bancos,
-      contratos,
-      metaAnual,
-      isLoading,
-      error,
-      addCliente,
-      updateCliente,
-      deleteCliente,
-      addBanco,
-      updateBanco,
-      deleteBanco,
-      addContrato,
-      updateContrato,
-      deleteContrato,
-      updateMetaAnual,
-      getClienteById,
-      getBancoById,
-      refreshData,
-      uploadContratoPdf,
-      downloadContratoPdf
-    }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );
