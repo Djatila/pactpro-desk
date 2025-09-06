@@ -35,7 +35,16 @@ export function TipoContratoManagerModal({
   onClose, 
   onTiposChange 
 }: TipoContratoManagerModalProps) {
-  const { loadTiposContrato, addTipoContrato, updateTipoContrato, deleteTipoContrato } = useData();
+  const dataContext = useData();
+  
+  // Adicionar log para depuração
+  console.log('DataContext:', dataContext);
+  
+  // Verificar se loadTiposContrato existe e é uma função
+  console.log('loadTiposContrato existe:', !!dataContext.loadTiposContrato);
+  console.log('loadTiposContrato é função:', typeof dataContext.loadTiposContrato === 'function');
+  
+  const { loadTiposContrato, addTipoContrato, updateTipoContrato, deleteTipoContrato } = dataContext;
   const [tipos, setTipos] = useState<TipoContrato[]>([]);
   const [newTipoLabel, setNewTipoLabel] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,9 +59,21 @@ export function TipoContratoManagerModal({
   }, [isOpen]);
 
   const loadTiposFromDatabase = async () => {
+    // Verificar novamente antes de chamar
+    console.log('Tentando chamar loadTiposContrato');
+    console.log('loadTiposContrato:', loadTiposContrato);
+    
+    if (typeof loadTiposContrato !== 'function') {
+      console.error('loadTiposContrato não é uma função válida');
+      toast.error('Erro na configuração do sistema de tipos de contrato');
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const tiposFromDB = await loadTiposContrato();
+      console.log('Tipos carregados do banco:', tiposFromDB);
+      
       // Converter os objetos retornados para o formato esperado
       const formattedTipos = tiposFromDB.map((tipo: any) => ({
         id: tipo.id,
@@ -60,6 +81,8 @@ export function TipoContratoManagerModal({
         label: tipo.label,
         isDefault: tipo.isDefault || tipo.is_default || false
       }));
+      
+      console.log('Tipos formatados:', formattedTipos);
       setTipos(formattedTipos);
     } catch (error) {
       console.error('Erro ao carregar tipos de contrato:', error);

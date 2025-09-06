@@ -35,7 +35,16 @@ export function ContratoFormModal({
 }: ContratoFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
-  const { clientes, bancos, contratos, loadTiposContrato } = useData();
+  const dataContext = useData();
+  
+  // Adicionar log para depuração
+  console.log('DataContext no ContratoFormModal:', dataContext);
+  
+  // Verificar se loadTiposContrato existe e é uma função
+  console.log('loadTiposContrato existe no ContratoFormModal:', !!dataContext.loadTiposContrato);
+  console.log('loadTiposContrato é função no ContratoFormModal:', typeof dataContext.loadTiposContrato === 'function');
+  
+  const { clientes, bancos, contratos, loadTiposContrato } = dataContext;
 
   const {
     register,
@@ -101,8 +110,18 @@ export function ContratoFormModal({
   useEffect(() => {
     const loadTipos = async () => {
       if (isOpen) {
+        // Verificar antes de chamar
+        console.log('Tentando chamar loadTiposContrato no useEffect');
+        console.log('loadTiposContrato no useEffect:', loadTiposContrato);
+        
+        if (typeof loadTiposContrato !== 'function') {
+          console.error('loadTiposContrato não é uma função válida no useEffect');
+          return;
+        }
+        
         try {
           const tipos = await loadTiposContrato();
+          console.log('Tipos carregados no useEffect:', tipos);
           setTiposContrato(tipos);
         } catch (error) {
           console.error('Erro ao carregar tipos de contrato:', error);

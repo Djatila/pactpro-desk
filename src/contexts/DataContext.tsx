@@ -1094,7 +1094,12 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Funções para gerenciamento de tipos de contrato
   const loadTiposContrato = async (): Promise<any[]> => {
-    if (!user) return [];
+    console.log('loadTiposContrato chamada');
+    
+    if (!user) {
+      console.log('Usuário não autenticado, retornando array vazio');
+      return [];
+    }
     
     try {
       const { data, error } = await supabase
@@ -1120,6 +1125,8 @@ export function DataProvider({ children }: DataProviderProps) {
         }
         throw error;
       }
+      
+      console.log('Dados carregados do banco:', data);
       
       // Se não houver tipos cadastrados, inserir os padrões
       if (!data || data.length === 0) {
@@ -1152,12 +1159,15 @@ export function DataProvider({ children }: DataProviderProps) {
         return tiposDefault;
       }
       
-      return data.map(tipo => ({
+      const result = data.map(tipo => ({
         id: tipo.id,
         value: tipo.value,
         label: tipo.label,
         isDefault: tipo.is_default
       }));
+      
+      console.log('Resultado formatado:', result);
+      return result;
     } catch (error) {
       console.error('Erro ao carregar tipos de contrato:', error);
       // Retornar tipos padrão em caso de erro
@@ -1290,33 +1300,20 @@ export function DataProvider({ children }: DataProviderProps) {
     loadTiposContrato,
     addTipoContrato,
     updateTipoContrato,
-    deleteTipoContrato
+    deleteTipoContrato,
   };
 
+  // Adicionar log para verificar o que está sendo exportado
+  console.log('Exportando value do DataContext:', {
+    clientes: !!value.clientes,
+    bancos: !!value.bancos,
+    contratos: !!value.contratos,
+    loadTiposContrato: !!value.loadTiposContrato,
+    loadTiposContratoType: typeof value.loadTiposContrato
+  });
+
   return (
-    <DataContext.Provider value={{
-      clientes,
-      bancos,
-      contratos,
-      metaAnual,
-      isLoading,
-      error,
-      addCliente,
-      updateCliente,
-      deleteCliente,
-      addBanco,
-      updateBanco,
-      deleteBanco,
-      addContrato,
-      updateContrato,
-      deleteContrato,
-      updateMetaAnual,
-      getClienteById,
-      getBancoById,
-      refreshData,
-      uploadContratoPdf,
-      downloadContratoPdf
-    }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );
