@@ -215,7 +215,7 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
               <p className="text-xs text-muted-foreground mt-2">
                 PDF máximo 10MB
               </p>
-            </CardContent>
+            </div>
 
             <input
               type="file"
