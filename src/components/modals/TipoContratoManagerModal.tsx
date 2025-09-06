@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { useData } from '@/contexts/DataContext';
 
 interface TipoContrato {
   id: string;
@@ -34,31 +35,39 @@ export function TipoContratoManagerModal({
   onClose, 
   onTiposChange 
 }: TipoContratoManagerModalProps) {
+  const { loadTiposContrato, addTipoContrato, updateTipoContrato, deleteTipoContrato } = useData();
   const [tipos, setTipos] = useState<TipoContrato[]>([]);
   const [newTipoLabel, setNewTipoLabel] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Carregar tipos existentes do localStorage
+  // Carregar tipos existentes do banco de dados
   useEffect(() => {
-    const savedTipos = localStorage.getItem('tiposContrato');
-    if (savedTipos) {
-      setTipos(JSON.parse(savedTipos));
-    } else {
-      // Tipos padrão se não houver nada salvo
-      const tiposDefault: TipoContrato[] = [
-        { id: '1', value: 'consignado-previdencia', label: 'Consignado Previdência', isDefault: true },
-        { id: '2', value: 'consignado-clt', label: 'Consignado CLT', isDefault: true },
-        { id: '3', value: 'emprestimo-pessoal', label: 'Empréstimo Pessoal', isDefault: true },
-        { id: '4', value: 'fgts', label: 'FGTS', isDefault: true },
-        { id: '5', value: 'emp-bolsa-familia', label: 'Emp. Bolsa Família', isDefault: true },
-        { id: '6', value: 'emp-conta-energia', label: 'Emp. Conta de Energia', isDefault: true },
-        { id: '7', value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', isDefault: true }
-      ];
-      setTipos(tiposDefault);
-      localStorage.setItem('tiposContrato', JSON.stringify(tiposDefault));
+    if (isOpen) {
+      loadTiposFromDatabase();
     }
   }, [isOpen]);
+
+  const loadTiposFromDatabase = async () => {
+    setIsLoading(true);
+    try {
+      const tiposFromDB = await loadTiposContrato();
+      // Converter os objetos retornados para o formato esperado
+      const formattedTipos = tiposFromDB.map((tipo: any) => ({
+        id: tipo.id,
+        value: tipo.value,
+        label: tipo.label,
+        isDefault: tipo.isDefault || tipo.is_default || false
+      }));
+      setTipos(formattedTipos);
+    } catch (error) {
+      console.error('Erro ao carregar tipos de contrato:', error);
+      toast.error('Erro ao carregar tipos de contrato');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const generateValue = (label: string): string => {
     return label
@@ -71,7 +80,7 @@ export function TipoContratoManagerModal({
       .replace(/^-|-$/g, ''); // Remove hífens no início e fim
   };
 
-  const handleAddTipo = () => {
+  const handleAddTipo = async () => {
     if (!newTipoLabel.trim()) {
       toast.error('Digite o nome do tipo de contrato');
       return;
@@ -85,20 +94,29 @@ export function TipoContratoManagerModal({
       return;
     }
 
-    const newTipo: TipoContrato = {
-      id: Date.now().toString(),
-      value,
-      label: newTipoLabel.trim(),
-      isDefault: false
-    };
+    setIsLoading(true);
+    try {
+      const result = await addTipoContrato({
+        value,
+        label: newTipoLabel.trim(),
+        is_default: false
+      });
 
-    const updatedTipos = [...tipos, newTipo];
-    setTipos(updatedTipos);
-    localStorage.setItem('tiposContrato', JSON.stringify(updatedTipos));
-    onTiposChange(updatedTipos);
-    
-    setNewTipoLabel('');
-    toast.success('Tipo de contrato adicionado com sucesso!');
+      if (result) {
+        await loadTiposFromDatabase();
+        setNewTipoLabel('');
+        toast.success('Tipo de contrato adicionado com sucesso!');
+        // Chamar o callback para notificar que os tipos mudaram
+        onTiposChange(tipos);
+      } else {
+        toast.error('Erro ao adicionar tipo de contrato. Verifique o console para mais detalhes.');
+      }
+    } catch (error: any) {
+      console.error('Erro ao adicionar tipo de contrato:', error);
+      toast.error(`Erro ao adicionar tipo de contrato: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditTipo = (id: string) => {
@@ -109,25 +127,37 @@ export function TipoContratoManagerModal({
     }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingLabel.trim()) {
       toast.error('Digite o nome do tipo de contrato');
       return;
     }
 
-    const updatedTipos = tipos.map(tipo => 
-      tipo.id === editingId 
-        ? { ...tipo, label: editingLabel.trim(), value: generateValue(editingLabel) }
-        : tipo
-    );
+    if (!editingId) return;
 
-    setTipos(updatedTipos);
-    localStorage.setItem('tiposContrato', JSON.stringify(updatedTipos));
-    onTiposChange(updatedTipos);
-    
-    setEditingId(null);
-    setEditingLabel('');
-    toast.success('Tipo de contrato atualizado com sucesso!');
+    setIsLoading(true);
+    try {
+      const result = await updateTipoContrato(editingId, {
+        label: editingLabel.trim(),
+        value: generateValue(editingLabel)
+      });
+
+      if (result) {
+        await loadTiposFromDatabase();
+        setEditingId(null);
+        setEditingLabel('');
+        toast.success('Tipo de contrato atualizado com sucesso!');
+        // Chamar o callback para notificar que os tipos mudaram
+        onTiposChange(tipos);
+      } else {
+        toast.error('Erro ao atualizar tipo de contrato. Verifique o console para mais detalhes.');
+      }
+    } catch (error: any) {
+      console.error('Erro ao atualizar tipo de contrato:', error);
+      toast.error(`Erro ao atualizar tipo de contrato: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -135,7 +165,7 @@ export function TipoContratoManagerModal({
     setEditingLabel('');
   };
 
-  const handleDeleteTipo = (id: string) => {
+  const handleDeleteTipo = async (id: string) => {
     const tipo = tipos.find(t => t.id === id);
     
     if (tipo?.isDefault) {
@@ -143,12 +173,24 @@ export function TipoContratoManagerModal({
       return;
     }
 
-    const updatedTipos = tipos.filter(t => t.id !== id);
-    setTipos(updatedTipos);
-    localStorage.setItem('tiposContrato', JSON.stringify(updatedTipos));
-    onTiposChange(updatedTipos);
-    
-    toast.success('Tipo de contrato removido com sucesso!');
+    setIsLoading(true);
+    try {
+      const result = await deleteTipoContrato(id);
+      
+      if (result) {
+        await loadTiposFromDatabase();
+        toast.success('Tipo de contrato removido com sucesso!');
+        // Chamar o callback para notificar que os tipos mudaram
+        onTiposChange(tipos);
+      } else {
+        toast.error('Erro ao remover tipo de contrato. Verifique o console para mais detalhes.');
+      }
+    } catch (error: any) {
+      console.error('Erro ao remover tipo de contrato:', error);
+      toast.error(`Erro ao remover tipo de contrato: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent, action: 'add' | 'edit') => {
@@ -188,10 +230,12 @@ export function TipoContratoManagerModal({
                     onChange={(e) => setNewTipoLabel(e.target.value)}
                     onKeyPress={(e) => handleKeyPress(e, 'add')}
                     className="flex-1"
+                    disabled={isLoading}
                   />
                   <Button 
                     onClick={handleAddTipo}
                     className="bg-gradient-primary hover:opacity-90"
+                    disabled={isLoading}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar
@@ -221,12 +265,14 @@ export function TipoContratoManagerModal({
                               onKeyPress={(e) => handleKeyPress(e, 'edit')}
                               className="flex-1"
                               autoFocus
+                              disabled={isLoading}
                             />
                             <Button 
                               size="sm" 
                               variant="ghost"
                               onClick={handleSaveEdit}
                               className="text-success hover:text-success"
+                              disabled={isLoading}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
@@ -235,6 +281,7 @@ export function TipoContratoManagerModal({
                               variant="ghost"
                               onClick={handleCancelEdit}
                               className="text-muted-foreground hover:text-destructive"
+                              disabled={isLoading}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -266,6 +313,7 @@ export function TipoContratoManagerModal({
                               variant="ghost"
                               onClick={() => handleEditTipo(tipo.id)}
                               className="text-muted-foreground hover:text-primary"
+                              disabled={isLoading}
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
@@ -275,7 +323,7 @@ export function TipoContratoManagerModal({
                             size="sm" 
                             variant="ghost"
                             onClick={() => handleDeleteTipo(tipo.id)}
-                            disabled={tipo.isDefault}
+                            disabled={tipo.isDefault || isLoading}
                             className={tipo.isDefault 
                               ? "text-muted-foreground cursor-not-allowed opacity-50" 
                               : "text-muted-foreground hover:text-destructive"
@@ -292,7 +340,7 @@ export function TipoContratoManagerModal({
               ))}
             </div>
 
-            {tipos.length === 0 && (
+            {tipos.length === 0 && !isLoading && (
               <Card className="border-dashed">
                 <CardContent className="p-8 text-center">
                   <Tag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

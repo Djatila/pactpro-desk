@@ -39,7 +39,8 @@ export default function Contratos() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
   const [searchParams] = useSearchParams();
-  const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf } = useData();
+  const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf, loadTiposContrato } = useData();
+  const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
 
   // Filtro por banco via URL
   const bancoFilter = searchParams.get('banco');
@@ -95,7 +96,27 @@ export default function Contratos() {
 
   const openEditModal = (contrato: any) => {
     console.log('Abrindo modal de edição para contrato:', contrato);
-    setEditingContrato(contrato);
+    // Garantir que todos os campos necessários estejam presentes
+    const contratoParaEdicao = {
+      id: contrato.id,
+      clienteId: contrato.clienteId,
+      bancoId: contrato.bancoId,
+      tipoContrato: contrato.tipoContrato,
+      valorTotal: contrato.valorTotal,
+      dataEmprestimo: contrato.dataEmprestimo,
+      parcelas: contrato.parcelas,
+      taxa: contrato.taxa,
+      observacoes: contrato.observacoes,
+      // Novos campos
+      primeiroVencimento: contrato.primeiroVencimento,
+      valorOperacao: contrato.valorOperacao,
+      valorSolicitado: contrato.valorSolicitado,
+      valorPrestacao: contrato.valorPrestacao,
+      // Campos para PDF
+      pdfUrl: contrato.pdfUrl,
+      pdfName: contrato.pdfName
+    };
+    setEditingContrato(contratoParaEdicao);
     setIsModalOpen(true);
   };
 
@@ -149,10 +170,12 @@ export default function Contratos() {
     }
   };
 
-  const handleTiposChange = (tipos: any[]) => {
-    // Forçar atualização dos tipos de contrato
-    // Isso será usado para atualizar os selects quando necessário
-    console.log('Tipos de contrato atualizados:', tipos);
+  const handleTiposChange = async () => {
+    // Atualizar os tipos de contrato quando houver mudanças
+    console.log('Tipos de contrato atualizados');
+    // Recarregar os tipos de contrato
+    const novosTipos = await loadTiposContrato();
+    setTiposContrato(novosTipos);
   };
 
   const filteredContratos = contratos.filter(contrato => {

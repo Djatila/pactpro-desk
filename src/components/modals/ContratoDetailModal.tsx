@@ -19,6 +19,25 @@ import {
   Download
 } from "lucide-react";
 
+// Funções auxiliares para status
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "ativo": return "bg-success text-success-foreground";
+    case "pendente": return "bg-warning text-warning-foreground";
+    case "finalizado": return "bg-info text-info-foreground";
+    default: return "";
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case "ativo": return "Ativo";
+    case "pendente": return "Pendente";
+    case "finalizado": return "Finalizado";
+    default: return status;
+  }
+};
+
 interface Contrato {
   id: string;
   clienteId: string;
@@ -53,6 +72,12 @@ interface ContratoDetailModalProps {
 
 export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos }: ContratoDetailModalProps) {
   if (!contrato) return null;
+
+  // Calcular data de término com base na data do empréstimo e número de parcelas
+  const dataTermino = contrato.dataEmprestimo && contrato.parcelas 
+    ? new Date(new Date(contrato.dataEmprestimo).setMonth(new Date(contrato.dataEmprestimo).getMonth() + contrato.parcelas - 1))
+        .toLocaleDateString('pt-BR') 
+    : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
