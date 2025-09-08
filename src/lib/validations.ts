@@ -43,6 +43,7 @@ const validateCNPJ = (cnpj: string): boolean => {
   const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
   const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
   
+  
   let sum = 0;
   for (let i = 0; i < 12; i++) {
     sum += parseInt(cleanCNPJ.charAt(i)) * weights1[i];
@@ -172,17 +173,9 @@ export const contratoSchema = z.object({
 
 export type ContratoFormData = z.infer<typeof contratoSchema>;
 
-// Removemos os campos de PDF do tipo pois eles são gerenciados separadamente
-// Tipos TypeScript derivados dos schemas
-
 // Função para obter tipos de contrato do contexto de dados ou padrão
 // Esta função deve ser usada em conjunto com o DataContext
-export const getTiposContrato = () => {
-  // Esta função agora é apenas um fallback para manter compatibilidade
-  // O componente ContratoFormModal agora carrega os tipos diretamente do contexto
-  
-  console.log('Usando função fallback getTiposContrato');
-  
+export const getTiposContrato = (): { value: string; label: string }[] => {
   // Tipos padrão
   return [
     { value: 'consignado-previdencia', label: 'Consignado Previdência' },
@@ -207,15 +200,11 @@ export const tiposContrato = [
 ] as const;
 
 // Função para obter o label do tipo de contrato
-export const getTipoContratoLabel = (value: string): string => {
-  console.log('Obtendo label para tipo de contrato:', value);
-  const tipos = getTiposContrato();
-  console.log('Tipos disponíveis:', tipos);
+export const getTipoContratoLabel = (value: string, tiposCarregados?: { value: string; label: string }[]): string => {
+  // Se tiposCarregados foi fornecido, use-os; caso contrário, use o fallback
+  const tipos = tiposCarregados && tiposCarregados.length > 0 ? tiposCarregados : getTiposContrato();
   const tipo = tipos.find(t => t.value === value);
-  console.log('Tipo encontrado:', tipo);
-  const result = tipo ? tipo.label : value;
-  console.log('Resultado:', result);
-  return result;
+  return tipo ? tipo.label : value || 'Tipo não especificado';
 };
 
 // Função para formatar CPF
@@ -243,11 +232,15 @@ export const formatPhone = (value: string): string => {
 
 // Função para formatar data
 export const formatDate = (value: string): string => {
+  console.log('Formatando data:', value);
   const cleanValue = value.replace(/\D/g, '');
   const match = cleanValue.match(/^(\d{2})(\d{2})(\d{4})$/);
   if (match) {
-    return `${match[1]}/${match[2]}/${match[3]}`;
+    const formattedDate = `${match[1]}/${match[2]}/${match[3]}`;
+    console.log('Data formatada:', formattedDate);
+    return formattedDate;
   }
+  console.log('Data não formatada:', cleanValue);
   return cleanValue;
 };
 
@@ -258,8 +251,10 @@ export const formatCurrency = (value: number): string => {
     return 'R$ 0,00';
   }
   
-  return value.toLocaleString('pt-BR', {
+  const formattedCurrency = value.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL'
   });
+  console.log('Moeda formatada:', value, '->', formattedCurrency);
+  return formattedCurrency;
 };

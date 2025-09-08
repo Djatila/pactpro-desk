@@ -47,9 +47,8 @@ export default function Contratos() {
   useEffect(() => {
     const loadTipos = async () => {
       try {
-        console.log('Carregando tipos de contrato na página de contratos...');
-        const tipos = await loadTiposContrato();
-        console.log('Tipos de contrato carregados na página:', tipos);
+        // Passar os contratos atuais para garantir que tipos personalizados sejam incluídos
+        const tipos = await loadTiposContrato(contratos);
         setTiposContrato(tipos);
       } catch (error) {
         console.error('Erro ao carregar tipos de contrato na página:', error);
@@ -57,7 +56,7 @@ export default function Contratos() {
     };
     
     loadTipos();
-  }, [loadTiposContrato]);
+  }, [loadTiposContrato, contratos]);
 
   // Filtro por banco via URL
   const bancoFilter = searchParams.get('banco');
@@ -70,9 +69,7 @@ export default function Contratos() {
   }, [bancoFiltrado]);
 
   const handleCreateContrato = async (data: ContratoFormData) => {
-    console.log('Criando contrato:', data);
     try {
-      console.log('Tentando criar contrato com dados:', data);
       // Remover campos de PDF dos dados antes de enviar
       const { pdfUrl, pdfName, ...formDataWithoutPdf } = data as any;
       const result = await addContrato(formDataWithoutPdf as any);
@@ -91,7 +88,6 @@ export default function Contratos() {
   };
 
   const handleEditContrato = async (data: ContratoFormData) => {
-    console.log('Editando contrato:', data);
     try {
       if (editingContrato) {
         // Remover campos de PDF dos dados antes de enviar
@@ -101,6 +97,12 @@ export default function Contratos() {
           // Não fechamos o modal automaticamente para permitir upload de PDF
           // O fechamento será feito pelo usuário quando clicar no botão "Concluir"
           toast.success('Contrato atualizado com sucesso!');
+          
+          // Atualizar os dados do contrato em edição para refletir as mudanças
+          setEditingContrato(prev => ({
+            ...prev,
+            ...data
+          }));
         } else {
           toast.error('Erro ao atualizar contrato');
         }
@@ -112,58 +114,55 @@ export default function Contratos() {
   };
 
   const openEditModal = (contrato: any) => {
-    console.log('Abrindo modal de edição para contrato:', contrato);
+    console.log('Abrindo modal de edição com contrato:', contrato);
     // Garantir que todos os campos necessários estejam presentes
     const contratoParaEdicao = {
       id: contrato.id,
-      clienteId: contrato.clienteId,
-      bancoId: contrato.bancoId,
-      tipoContrato: contrato.tipoContrato,
-      valorTotal: contrato.valorTotal,
-      dataEmprestimo: contrato.dataEmprestimo,
-      parcelas: contrato.parcelas,
-      taxa: contrato.taxa,
-      observacoes: contrato.observacoes,
+      clienteId: contrato.clienteId || '',
+      bancoId: contrato.bancoId || '',
+      tipoContrato: contrato.tipoContrato || '',
+      valorTotal: contrato.valorTotal !== undefined ? contrato.valorTotal : 0,
+      dataEmprestimo: contrato.dataEmprestimo || '',
+      parcelas: contrato.parcelas !== undefined ? contrato.parcelas : 0,
+      taxa: contrato.taxa !== undefined ? contrato.taxa : 0,
+      observacoes: contrato.observacoes || '',
       // Novos campos
-      primeiroVencimento: contrato.primeiroVencimento,
-      valorOperacao: contrato.valorOperacao,
-      valorSolicitado: contrato.valorSolicitado,
-      valorPrestacao: contrato.valorPrestacao,
+      primeiroVencimento: contrato.primeiroVencimento || '',
+      valorOperacao: contrato.valorOperacao !== undefined ? contrato.valorOperacao : 0,
+      valorSolicitado: contrato.valorSolicitado !== undefined ? contrato.valorSolicitado : 0,
+      valorPrestacao: contrato.valorPrestacao !== undefined ? contrato.valorPrestacao : 0,
       // Campos para PDF
-      pdfUrl: contrato.pdfUrl,
-      pdfName: contrato.pdfName
+      pdfUrl: contrato.pdfUrl || '',
+      pdfName: contrato.pdfName || ''
     };
+    
+    console.log('Contrato para edição:', contratoParaEdicao);
     setEditingContrato(contratoParaEdicao);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
-    console.log('Fechando modal de contrato via closeModal');
     setIsModalOpen(false);
     setEditingContrato(null);
   };
 
   // Nova função para fechar o modal explicitamente
   const handleModalClose = () => {
-    console.log('Fechando modal de contrato via handleModalClose');
     setIsModalOpen(false);
     setEditingContrato(null);
   };
 
   const handleViewContrato = (contrato: any) => {
-    console.log('Abrindo modal de visualização para contrato:', contrato);
     setViewingContrato(contrato);
     setIsDetailModalOpen(true);
   };
 
   const handleDeleteContrato = (contrato: any) => {
-    console.log('Abrindo modal de confirmação de exclusão para contrato:', contrato);
     setDeletingContrato(contrato);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDeleteContrato = async () => {
-    console.log('Confirmando exclusão de contrato:', deletingContrato);
     try {
       if (deletingContrato) {
         deleteContrato(deletingContrato.id);
@@ -177,7 +176,6 @@ export default function Contratos() {
   };
 
   const handleDownloadContrato = (contrato: any) => {
-    console.log('Fazendo download de contrato:', contrato);
     if (contrato.pdfUrl) {
       // Se tiver PDF anexado, fazer download diretamente
       window.open(contrato.pdfUrl, '_blank');
@@ -189,13 +187,8 @@ export default function Contratos() {
 
   const handleTiposChange = async () => {
     // Atualizar os tipos de contrato quando houver mudanças
-    console.log('Tipos de contrato atualizados');
-    // Recarregar os tipos de contrato
     const novosTipos = await loadTiposContrato();
-    console.log('Novos tipos carregados:', novosTipos);
     setTiposContrato(novosTipos);
-    // Chamar refreshData para atualizar todos os dados
-    await refreshData();
   };
 
   const filteredContratos = contratos.filter(contrato => {
@@ -398,7 +391,7 @@ export default function Contratos() {
                         </div>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <FileText className="h-4 w-4" />
-                          {getTipoContratoLabel(contrato.tipoContrato)}
+                          {getTipoContratoLabel(contrato.tipoContrato, tiposContrato)}
                         </div>
                       </div>
                     </div>
@@ -465,10 +458,7 @@ export default function Contratos() {
                       variant="ghost" 
                       size="icon" 
                       className="h-8 w-8"
-                      onClick={() => {
-                        console.log('Botão de edição clicado para contrato:', contrato);
-                        openEditModal(contrato);
-                      }}
+                      onClick={() => openEditModal(contrato)}
                       title="Editar contrato"
                     >
                       <Edit className="h-4 w-4" />
@@ -535,19 +525,18 @@ export default function Contratos() {
       <ContratoDetailModal
         isOpen={isDetailModalOpen}
         onClose={() => {
-          console.log('Fechando modal de detalhes');
           setIsDetailModalOpen(false);
           setViewingContrato(null);
         }}
         contrato={viewingContrato}
         todosContratos={contratos}
+        tiposContrato={tiposContrato}
       />
 
       {/* Modal de Confirmação de Exclusão */}
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
-          console.log('Fechando modal de confirmação de exclusão');
           setIsDeleteModalOpen(false);
           setDeletingContrato(null);
         }}
@@ -568,7 +557,6 @@ export default function Contratos() {
       <TipoContratoManagerModal
         isOpen={isTipoManagerModalOpen}
         onClose={() => {
-          console.log('Fechando modal do gerenciador de tipos de contrato');
           setIsTipoManagerModalOpen(false);
         }}
         onTiposChange={handleTiposChange}

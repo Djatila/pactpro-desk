@@ -143,11 +143,11 @@ export function DataProvider({ children }: DataProviderProps) {
   // Carregar dados quando o usuário estiver autenticado
   useEffect(() => {
     if (isAuthenticated && user?.id) {
-      console.log('🔄 DataContext: Carregando dados para usuário:', user.id);
+      console.log('Usuário autenticado, iniciando carregamento de dados...');
       refreshData();
     } else {
-      console.log('🧙 DataContext: Limpando dados - usuário não autenticado');
       // Limpar dados quando não autenticado
+      console.log('Usuário não autenticado, limpando dados...');
       setClientes([]);
       setBancos([]);
       setContratos([]);
@@ -160,7 +160,6 @@ export function DataProvider({ children }: DataProviderProps) {
     
     // Verificar se o Supabase está configurado
     if (!supabase || typeof supabase.from !== 'function') {
-      console.warn('⚠️ Supabase não configurado. Dados não serão sincronizados.');
       setIsLoading(false);
       return;
     }
@@ -169,6 +168,7 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
+      console.log('Iniciando carregamento de dados...');
       // Carregar clientes e bancos primeiro para ter a lista completa
       await Promise.all([
         loadClientes(),
@@ -180,6 +180,7 @@ export function DataProvider({ children }: DataProviderProps) {
       
       // Por fim carregar configurações
       await loadMetaAnual();
+      console.log('Dados carregados com sucesso!');
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados');
@@ -210,6 +211,7 @@ export function DataProvider({ children }: DataProviderProps) {
         contratos: 0 // Será calculado depois
       }));
 
+      console.log('Clientes carregados:', clientesFormatted);
       setClientes(clientesFormatted);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -239,6 +241,7 @@ export function DataProvider({ children }: DataProviderProps) {
         volumeTotal: 'R$ 0' // Será calculado depois
       }));
 
+      console.log('Bancos carregados:', bancosFormatted);
       setBancos(bancosFormatted);
     } catch (error) {
       console.error('Erro ao carregar bancos:', error);
@@ -297,6 +300,7 @@ export function DataProvider({ children }: DataProviderProps) {
         };
       });
 
+      console.log('Contratos carregados:', contratosFormatted);
       setContratos(contratosFormatted);
       updateMetrics(contratosFormatted);
     } catch (error) {
@@ -318,6 +322,7 @@ export function DataProvider({ children }: DataProviderProps) {
       }
 
       if (data) {
+        console.log('Meta anual carregada:', data.meta_anual);
         setMetaAnual(data.meta_anual);
       }
     } catch (error) {
@@ -326,9 +331,7 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const updateMetrics = (contratos: Contrato[]) => {
-    console.log('📊 Atualizando métricas dos bancos e clientes...');
-    console.log('📈 Contratos carregados:', contratos.length);
-    
+    console.log('Atualizando métricas com contratos:', contratos);
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
       const updatedClientes = prev.map(cliente => {
@@ -339,11 +342,8 @@ export function DataProvider({ children }: DataProviderProps) {
         const hasContratosAtivos = clienteContratos.some(c => c.status === 'ativo');
         const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
         
-        console.log(`👤 Cliente ${cliente.nome}: ${clienteContratos.length} contratos, ${hasContratosAtivos ? 'ativo' : 'inativo'}`);
-        
         // Só retornar novo objeto se realmente mudou
         if (cliente.contratos !== newContratosCount || cliente.status !== newStatus) {
-          console.log(`🔄 Atualizando cliente ${cliente.nome}: ${cliente.status} -> ${newStatus}`);
           return {
             ...cliente,
             contratos: newContratosCount,
@@ -352,8 +352,6 @@ export function DataProvider({ children }: DataProviderProps) {
         }
         return cliente; // Manter referência se não mudou
       });
-      
-      
       
       // Só atualizar se algo realmente mudou
       const hasChanges = updatedClientes.some((cliente, index) => cliente !== prev[index]);
@@ -375,13 +373,10 @@ export function DataProvider({ children }: DataProviderProps) {
         const hasContratosAtivos = contratosBank.some(c => c.status === 'ativo');
         const newStatus: 'ativo' | 'inativo' = hasContratosAtivos ? 'ativo' : 'inativo';
         
-        console.log(`🏦 Banco ${banco.nome}: ${contratosBank.length} contratos, ${newStatus}`);
-        
         // Só retornar novo objeto se realmente mudou
         if (banco.contratos !== newContratosCount || 
             banco.volumeTotal !== newVolumeTotalFormatted ||
             banco.status !== newStatus) {
-          console.log(`🔄 Atualizando banco ${banco.nome}: ${banco.status} -> ${newStatus}`);
           return {
             ...banco,
             contratos: newContratosCount,
@@ -597,13 +592,10 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>): Promise<boolean> => {
-    console.log('Adicionando contrato:', contratoData);
     if (!user) return false;
     
     setIsLoading(true);
     setError(null);
-    
-    console.log(' Tentando criar contrato com dados:', contratoData);
 
     try {
       // Remover campos de PDF dos dados do contrato antes de enviar para o banco
@@ -649,7 +641,6 @@ export function DataProvider({ children }: DataProviderProps) {
   };
 
   const updateContrato = async (id: string, contratoData: Partial<Contrato>): Promise<boolean> => {
-    console.log('Atualizando contrato:', id, contratoData);
     if (!user) return false;
     
     setIsLoading(true);
@@ -662,7 +653,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const updateData: any = {};
       if (contratoDataWithoutPdf.clienteId) updateData.cliente_id = contratoDataWithoutPdf.clienteId;
       if (contratoDataWithoutPdf.bancoId) updateData.banco_id = contratoDataWithoutPdf.bancoId;
-      if (contratoDataWithoutPdf.tipoContrato) updateData.tipo_contrato = contratoDataWithoutPdf.tipoContrato;
+      if (contratoDataWithoutPdf.tipoContrato !== undefined) updateData.tipo_contrato = contratoDataWithoutPdf.tipoContrato;
       if (contratoDataWithoutPdf.dataEmprestimo) updateData.data_emprestimo = contratoDataWithoutPdf.dataEmprestimo;
       if (contratoDataWithoutPdf.valorTotal !== undefined) updateData.valor_total = contratoDataWithoutPdf.valorTotal;
       if (contratoDataWithoutPdf.parcelas !== undefined) updateData.parcelas = contratoDataWithoutPdf.parcelas;
@@ -720,9 +711,6 @@ export function DataProvider({ children }: DataProviderProps) {
         throw new Error('Usuário não autenticado. Faça login novamente.');
       }
       
-      console.log('Usuário autenticado:', session.user.id);
-      
-      console.log('Listando buckets disponíveis...');
       const { data: buckets, error } = await supabase.storage.listBuckets();
       
       if (error) {
@@ -734,29 +722,21 @@ export function DataProvider({ children }: DataProviderProps) {
         return false;
       }
       
-      console.log('Buckets encontrados:', buckets);
-      
       // Verificar se temos buckets
       if (!buckets) {
-        console.log('Nenhum bucket retornado');
         return false;
       }
       
       // Verificar se é um array
       if (!Array.isArray(buckets)) {
-        console.log('Buckets não é um array:', typeof buckets, buckets);
         return false;
       }
       
       const bucketExists = buckets.some(bucket => {
-        console.log(`Verificando bucket: ${bucket.name} (id: ${bucket.id})`);
         return bucket.name === 'contratos-pdfs';
       });
       
-      console.log('Bucket "contratos-pdfs" encontrado:', bucketExists);
-      
       if (!bucketExists) {
-        console.log('Lista de todos os buckets disponíveis:');
         buckets.forEach(bucket => {
           console.log(`- ${bucket.name} (id: ${bucket.id}, public: ${bucket.public})`);
         });
@@ -771,8 +751,6 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Função para upload de PDF do contrato
   const uploadContratoPdf = async (contratoId: string, file: File | null): Promise<boolean> => {
-    console.log('Iniciando upload de PDF para contrato:', contratoId, file?.name);
-    
     // Verificar autenticação do usuário
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
@@ -786,8 +764,6 @@ export function DataProvider({ children }: DataProviderProps) {
       setError('Usuário não autenticado. Faça login novamente.');
       return false;
     }
-    
-    console.log('Usuário autenticado:', session.user);
     
     if (!user) {
       console.error('Contexto de usuário não disponível');
@@ -809,16 +785,11 @@ export function DataProvider({ children }: DataProviderProps) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}/${contratoId}.${fileExt}`;
         
-        console.log('Tentando upload do arquivo:', fileName);
-        
         // Verificar se o bucket existe
-        console.log('Verificando existência do bucket...');
         const bucketExists = await checkStorageBucket();
-        console.log('Resultado da verificação do bucket:', bucketExists);
         
         if (!bucketExists) {
           // Tentativa alternativa de verificar o bucket
-          console.log('Tentando verificar bucket com método alternativo...');
           try {
             const { data: testData, error: testError } = await supabase.storage.from('contratos-pdfs').list('', { limit: 1 });
             if (testError) {
@@ -828,8 +799,6 @@ export function DataProvider({ children }: DataProviderProps) {
               } else {
                 throw new Error(`Erro ao acessar bucket: ${testError.message}`);
               }
-            } else {
-              console.log('Teste de acesso ao bucket bem-sucedido');
             }
           } catch (testError) {
             console.error('Erro no teste alternativo:', testError);
@@ -857,12 +826,9 @@ export function DataProvider({ children }: DataProviderProps) {
         }
 
         // Obter URL pública do arquivo
-        console.log('Obtendo URL pública para:', fileName);
         const { data: urlData } = supabase.storage
           .from('contratos-pdfs')
           .getPublicUrl(fileName);
-
-        console.log('URL pública obtida:', urlData);
 
         // Verificar se a URL foi obtida corretamente
         if (!urlData?.publicUrl) {
@@ -870,7 +836,6 @@ export function DataProvider({ children }: DataProviderProps) {
         }
 
         // Atualizar contrato com informações do PDF
-        console.log('Atualizando contrato com informações do PDF...');
         const { error: updateError } = await supabase
           .from('contratos')
           .update({
@@ -883,11 +848,8 @@ export function DataProvider({ children }: DataProviderProps) {
           console.error('Erro ao atualizar contrato com PDF:', updateError);
           throw updateError;
         }
-        
-        console.log('Contrato atualizado com sucesso');
       } else {
         // Remover PDF do contrato
-        console.log('Removendo PDF do contrato...');
         const { error: updateError } = await supabase
           .from('contratos')
           .update({
@@ -900,12 +862,8 @@ export function DataProvider({ children }: DataProviderProps) {
           console.error('Erro ao remover PDF do contrato:', updateError);
           throw updateError;
         }
-        
-        console.log('PDF removido com sucesso');
       }
 
-      // Em vez de recarregar todos os contratos, vamos atualizar apenas o contrato específico
-      // await loadContratos();
       // Atualizar apenas o contrato modificado
       await updateSingleContrato(contratoId);
       return true;
@@ -926,7 +884,6 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Função para atualizar um único contrato após mudanças no PDF
   const updateSingleContrato = async (contratoId: string) => {
-    console.log('Atualizando contrato individual:', contratoId);
     try {
       const { data, error } = await supabase
         .from('contratos')
@@ -981,11 +938,9 @@ export function DataProvider({ children }: DataProviderProps) {
           
           if (contratoExists) {
             // Se existe, atualizar apenas esse contrato
-            console.log('Atualizando contrato existente no estado');
             return prev.map(c => c.id === contratoId ? contratoFormatted : c);
           } else {
             // Se não existe, adicionar o novo contrato
-            console.log('Adicionando novo contrato ao estado');
             return [...prev, contratoFormatted];
           }
         });
@@ -1094,15 +1049,10 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Funções para gerenciamento de tipos de contrato
   // Função para carregar tipos de contrato do banco de dados
-  const loadTiposContrato = async (): Promise<any[]> => {
-    console.log('loadTiposContrato chamada');
-    
+  const loadTiposContrato = async (contratosAtuais?: Contrato[]): Promise<any[]> => {
     if (!user) {
-      console.log('Usuário não autenticado, retornando array vazio');
       return [];
     }
-    
-    console.log('Carregando tipos de contrato para usuário:', user?.id);
     
     try {
       const { data, error } = await supabase
@@ -1115,7 +1065,6 @@ export function DataProvider({ children }: DataProviderProps) {
         console.error('Erro ao carregar tipos de contrato:', error);
         // Se for um erro de tabela não encontrada, retornar tipos padrão
         if (error.message.includes('relation') && error.message.includes('does not exist')) {
-          console.log('Tabela tipos_contrato não encontrada, retornando tipos padrão');
           return [
             { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
             { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
@@ -1129,11 +1078,8 @@ export function DataProvider({ children }: DataProviderProps) {
         throw error;
       }
       
-      console.log('Dados de tipos de contrato carregados:', data);
-      
       // Se não houver tipos cadastrados, inserir os padrões
       if (!data || data.length === 0) {
-        console.log('Nenhum tipo de contrato encontrado, inserindo tipos padrão');
         const tiposDefault = [
           { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
           { value: 'consignado-clt', label: 'Consignado CLT', is_default: true },
@@ -1160,17 +1106,38 @@ export function DataProvider({ children }: DataProviderProps) {
           return tiposDefault;
         }
         
-        console.log('Tipos de contrato padrão inseridos com sucesso');
         return tiposDefault;
       }
       
-      console.log('Retornando tipos de contrato do banco de dados');
-      return data.map(tipo => ({
+      // Processar os tipos de contrato carregados
+      const tiposProcessados = data.map(tipo => ({
         id: tipo.id,
         value: tipo.value,
         label: tipo.label,
         isDefault: tipo.is_default
       }));
+      
+      // Verificar se há tipos de contrato nos contratos que não estão na lista
+      // Usar contratos passados como parâmetro ou os contratos do estado atual
+      const contratosParaVerificar = contratosAtuais || contratos;
+      const tiposNosContratos = contratosParaVerificar
+        .map(c => c.tipoContrato)
+        .filter((tipo, index, self) => self.indexOf(tipo) === index) // Remover duplicatas
+        .filter(tipo => tipo && !tiposProcessados.some(t => t.value === tipo)); // Apenas tipos que não estão na lista e não são vazios
+      
+      // Adicionar tipos de contrato personalizados que estão nos contratos
+      const tiposCompletos = [...tiposProcessados];
+      tiposNosContratos.forEach(tipo => {
+        if (tipo && !tiposCompletos.some(t => t.value === tipo)) {
+          tiposCompletos.push({
+            value: tipo,
+            label: tipo,
+            isDefault: false
+          });
+        }
+      });
+      
+      return tiposCompletos;
     } catch (error) {
       console.error('Erro ao carregar tipos de contrato:', error);
       // Retornar tipos padrão em caso de erro
@@ -1193,7 +1160,6 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
-      console.log('Adicionando novo tipo de contrato:', tipoData);
       const tipoInsert: TipoContratoInsert = {
         ...tipoData,
         user_id: user.id
@@ -1205,7 +1171,6 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      console.log('Tipo de contrato adicionado com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'adicionar tipo de contrato');
@@ -1222,7 +1187,6 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
-      console.log('Atualizando tipo de contrato:', { id, tipoData });
       const { error } = await supabase
         .from('tipos_contrato')
         .update(tipoData)
@@ -1231,7 +1195,6 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      console.log('Tipo de contrato atualizado com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'atualizar tipo de contrato');
@@ -1248,7 +1211,6 @@ export function DataProvider({ children }: DataProviderProps) {
     setError(null);
 
     try {
-      console.log('Removendo tipo de contrato:', id);
       // Verificar se é um tipo padrão
       const { data, error: selectError } = await supabase
         .from('tipos_contrato')
@@ -1271,7 +1233,6 @@ export function DataProvider({ children }: DataProviderProps) {
 
       if (error) throw error;
 
-      console.log('Tipo de contrato removido com sucesso');
       return true;
     } catch (error) {
       handleSupabaseError(error, 'deletar tipo de contrato');
@@ -1311,15 +1272,6 @@ export function DataProvider({ children }: DataProviderProps) {
     updateTipoContrato,
     deleteTipoContrato,
   };
-
-  // Adicionar log para verificar o que está sendo exportado
-  console.log('Exportando value do DataContext:', {
-    clientes: !!value.clientes,
-    bancos: !!value.bancos,
-    contratos: !!value.contratos,
-    loadTiposContrato: !!value.loadTiposContrato,
-    loadTiposContratoType: typeof value.loadTiposContrato
-  });
 
   return (
     <DataContext.Provider value={value}>

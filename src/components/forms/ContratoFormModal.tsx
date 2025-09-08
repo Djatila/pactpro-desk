@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { contratoSchema, type ContratoFormData, formatDate, formatCurrency } from '@/lib/validations';
+import { contratoSchema, type ContratoFormData, formatDate, formatCurrency, getTiposContrato } from '@/lib/validations';
 import { getProximoNumeroContrato } from '@/lib/utils';
 import { useData } from '@/contexts/DataContext';
 import { ContratoPdfManager } from '@/components/ContratoPdfManager';
@@ -37,13 +37,6 @@ export function ContratoFormModal({
   const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
   const dataContext = useData();
   
-  // Adicionar log para depuração
-  console.log('DataContext no ContratoFormModal:', dataContext);
-  
-  // Verificar se loadTiposContrato existe e é uma função
-  console.log('loadTiposContrato existe no ContratoFormModal:', !!dataContext.loadTiposContrato);
-  console.log('loadTiposContrato é função no ContratoFormModal:', typeof dataContext.loadTiposContrato === 'function');
-  
   const { clientes, bancos, contratos, loadTiposContrato } = dataContext;
 
   const {
@@ -56,7 +49,20 @@ export function ContratoFormModal({
     control
   } = useForm<ContratoFormData>({
     resolver: zodResolver(contratoSchema),
-    defaultValues: initialData
+    defaultValues: {
+      clienteId: '',
+      bancoId: '',
+      tipoContrato: '',
+      valorTotal: 0,
+      dataEmprestimo: '',
+      parcelas: 0,
+      taxa: 0,
+      observacoes: '',
+      primeiroVencimento: '',
+      valorOperacao: 0,
+      valorSolicitado: 0,
+      valorPrestacao: 0
+    }
   });
 
   const valorTotal = watch('valorTotal');
@@ -71,6 +77,24 @@ export function ContratoFormModal({
   const valorOperacao = watch('valorOperacao');
   const valorSolicitado = watch('valorSolicitado');
   const valorPrestacao = watch('valorPrestacao');
+  
+  // Efeito para monitorar mudanças nos valores
+  useEffect(() => {
+    console.log('Valores do formulário:', {
+      clienteId,
+      bancoId,
+      tipoContrato,
+      valorTotal,
+      dataEmprestimo,
+      parcelas,
+      taxa,
+      observacoes: watch('observacoes'),
+      primeiroVencimento,
+      valorOperacao,
+      valorSolicitado,
+      valorPrestacao
+    });
+  }, [clienteId, bancoId, tipoContrato, valorTotal, dataEmprestimo, parcelas, taxa, primeiroVencimento, valorOperacao, valorSolicitado, valorPrestacao]);
 
   // Função para obter data atual no formato DD/MM/AAAA
   const getDataAtual = (): string => {
@@ -78,12 +102,15 @@ export function ContratoFormModal({
     const dia = hoje.getDate().toString().padStart(2, '0');
     const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
     const ano = hoje.getFullYear();
-    return `${dia}/${mes}/${ano}`;
+    const dataAtual = `${dia}/${mes}/${ano}`;
+    console.log('Data atual:', dataAtual);
+    return dataAtual;
   };
 
   // Função para formatar valor monetário no padrão brasileiro (1.000,00)
   const formatCurrencyInput = (value: number | string): string => {
     if (value === '' || value === undefined || value === null) return '';
+    console.log('Formatando valor monetário:', value);
     
     // Converter para número se for string
     let numValue: number;
@@ -98,232 +125,257 @@ export function ContratoFormModal({
     if (isNaN(numValue)) return '';
     
     // Formatar com separador de milhar e decimal
-    return numValue.toLocaleString('pt-BR', {
+    const formattedValue = numValue.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+    console.log('Valor formatado:', formattedValue);
+    return formattedValue;
   };
 
   // Função para parsear valor monetário do formato brasileiro para número
   const parseCurrencyInput = (value: string): number => {
     if (!value) return 0;
-    
+    console.log('Parseando valor monetário:', value);
     // Remover pontos e substituir vírgula por ponto para parse
     const cleanValue = value.replace(/\./g, '').replace(',', '.');
-    return parseFloat(cleanValue) || 0;
+    const parsedValue = parseFloat(cleanValue) || 0;
+    console.log('Valor parseado:', parsedValue);
+    return parsedValue;
   };
 
   // Função para lidar com entrada de valores monetários em tempo real
   const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: keyof ContratoFormData) => {
     const inputValue = e.target.value;
-    
+    console.log(`Alterando campo ${fieldName} para:`, inputValue);
     // Atualizar o valor no formulário mantendo exatamente como digitado
     setValue(fieldName, inputValue as any);
   };
 
   // Função para formatar o valor ao sair do campo
   const handleCurrencyBlur = (fieldName: keyof ContratoFormData, value: string | number) => {
+    console.log(`Saindo do campo ${fieldName} com valor:`, value);
     // Converter o valor para número e aplicar formatação
     const numericValue = typeof value === 'string' ? parseCurrencyInput(value) : value;
     setValue(fieldName, numericValue);
   };
 
+  // Reset do formulário quando initialData mudar ou modal abrir/fechar
+  useEffect(() => {
+    const initializeForm = async () => {
+      if (isOpen) {
+        // Carregar tipos de contrato
+        try {
+          let tipos: {value: string, label: string}[] = [];
+          
+          // Verificar se loadTiposContrato está disponível e é uma função
+          if (typeof loadTiposContrato === 'function') {
+            // Passar os contratos atuais para garantir que tipos personalizados sejam incluídos
+            tipos = await loadTiposContrato(contratos);
+          } else {
+            // Usar tipos padrão se loadTiposContrato não estiver disponível
+            tipos = getTiposContrato();
+          }
+          
+          // Verificar se o tipo de contrato do contrato sendo editado está nos tipos carregados
+          if (mode === 'edit' && initialData && initialData.tipoContrato) {
+            const tipoExiste = tipos.some(tipo => tipo.value === initialData.tipoContrato);
+            
+            // Se o tipo não existir, adicionar uma opção temporária
+            if (!tipoExiste && initialData.tipoContrato) {
+              tipos = [
+                ...tipos,
+                { value: initialData.tipoContrato, label: initialData.tipoContrato }
+              ];
+            }
+          }
+          
+          setTiposContrato(tipos);
+        } catch (error) {
+          console.error('Erro ao carregar tipos de contrato:', error);
+          // Usar tipos padrão em caso de erro
+          setTiposContrato(getTiposContrato());
+        }
+
+        // Preencher o formulário com os dados iniciais
+        if (initialData && mode === 'edit') {
+          console.log('Dados iniciais para edição:', initialData);
+          // Reset com os dados do contrato para edição
+          reset({
+            clienteId: initialData.clienteId || '',
+            bancoId: initialData.bancoId || '',
+            tipoContrato: initialData.tipoContrato || '',
+            valorTotal: initialData.valorTotal !== undefined ? initialData.valorTotal : 0,
+            dataEmprestimo: initialData.dataEmprestimo || getDataAtual(),
+            parcelas: initialData.parcelas !== undefined ? initialData.parcelas : 0,
+            taxa: initialData.taxa !== undefined ? initialData.taxa : 0,
+            observacoes: initialData.observacoes || '',
+            // Novos campos
+            primeiroVencimento: initialData.primeiroVencimento || getDataAtual(),
+            valorOperacao: initialData.valorOperacao !== undefined ? initialData.valorOperacao : 0,
+            valorSolicitado: initialData.valorSolicitado !== undefined ? initialData.valorSolicitado : 0,
+            valorPrestacao: initialData.valorPrestacao !== undefined ? initialData.valorPrestacao : 0
+          });
+          
+          // Definir valores individuais também para garantir que todos os campos sejam preenchidos
+          setTimeout(() => {
+            setValue('clienteId', initialData.clienteId || '');
+            setValue('bancoId', initialData.bancoId || '');
+            setValue('tipoContrato', initialData.tipoContrato || '');
+            setValue('valorTotal', initialData.valorTotal !== undefined ? initialData.valorTotal : 0);
+            setValue('dataEmprestimo', initialData.dataEmprestimo || getDataAtual());
+            setValue('parcelas', initialData.parcelas !== undefined ? initialData.parcelas : 0);
+            setValue('taxa', initialData.taxa !== undefined ? initialData.taxa : 0);
+            setValue('observacoes', initialData.observacoes || '');
+            // Novos campos
+            setValue('primeiroVencimento', initialData.primeiroVencimento || getDataAtual());
+            setValue('valorOperacao', initialData.valorOperacao !== undefined ? initialData.valorOperacao : 0);
+            setValue('valorSolicitado', initialData.valorSolicitado !== undefined ? initialData.valorSolicitado : 0);
+            setValue('valorPrestacao', initialData.valorPrestacao !== undefined ? initialData.valorPrestacao : 0);
+          }, 0);
+        } else if (mode === 'create') {
+          // Reset para formulário vazio quando for criação
+          const dataAtual = getDataAtual();
+          reset({
+            clienteId: '',
+            bancoId: '',
+            tipoContrato: '',
+            valorTotal: 0,
+            dataEmprestimo: dataAtual,
+            parcelas: 0,
+            taxa: 0,
+            observacoes: '',
+            // Novos campos com valores padrão apropriados
+            primeiroVencimento: dataAtual,
+            valorOperacao: 0,
+            valorSolicitado: 0,
+            valorPrestacao: 0
+          });
+        }
+      }
+    };
+    
+    initializeForm();
+  }, [isOpen, initialData, reset, mode, loadTiposContrato, contratos, setValue]);
+  
   // Atualizar tipos de contrato quando o modal abrir
   useEffect(() => {
     const loadTipos = async () => {
       if (isOpen) {
-        // Verificar antes de chamar
-        console.log('Tentando chamar loadTiposContrato no useEffect');
-        console.log('loadTiposContrato no useEffect:', loadTiposContrato);
-        
-        if (typeof loadTiposContrato !== 'function') {
-          console.error('loadTiposContrato não é uma função válida no useEffect');
-          return;
-        }
-        
         try {
-          console.log('Carregando tipos de contrato...');
-          const tipos = await loadTiposContrato();
-          console.log('Tipos de contrato carregados:', tipos);
+          let tipos: {value: string, label: string}[] = [];
+          
+          // Verificar se loadTiposContrato está disponível e é uma função
+          if (typeof loadTiposContrato === 'function') {
+            // Passar os contratos atuais para garantir que tipos personalizados sejam incluídos
+            tipos = await loadTiposContrato(contratos);
+          } else {
+            // Usar tipos padrão se loadTiposContrato não estiver disponível
+            tipos = getTiposContrato();
+          }
+          
+          // Verificar se o tipo de contrato do contrato sendo editado está nos tipos carregados
+          if (mode === 'edit' && initialData && initialData.tipoContrato) {
+            const tipoExiste = tipos.some(tipo => tipo.value === initialData.tipoContrato);
+            
+            // Se o tipo não existir, adicionar uma opção temporária
+            if (!tipoExiste && initialData.tipoContrato) {
+              tipos = [
+                ...tipos,
+                { value: initialData.tipoContrato, label: initialData.tipoContrato }
+              ];
+            }
+          }
+          
           setTiposContrato(tipos);
+          
+          // Se estivermos em modo de edição, garantir que o valor do tipo de contrato esteja definido
+          if (mode === 'edit' && initialData && initialData.tipoContrato) {
+            // Aguardar um tick para garantir que o estado foi atualizado antes de definir o valor
+            setTimeout(() => {
+              setValue('tipoContrato', initialData.tipoContrato);
+            }, 0);
+          }
         } catch (error) {
           console.error('Erro ao carregar tipos de contrato:', error);
+          // Usar tipos padrão em caso de erro
+          setTiposContrato(getTiposContrato());
         }
       }
     };
     
     loadTipos();
-  }, [isOpen, loadTiposContrato]);
+  }, [isOpen, initialData?.tipoContrato, loadTiposContrato, contratos, mode, setValue]);
 
-  // Reset do formulário quando initialData mudar ou modal abrir/fechar
-  useEffect(() => {
-    console.log('useEffect do formulário executado', { initialData, mode, isOpen });
-    if (initialData && mode === 'edit') {
-      // Reset com os dados do contrato para edição
-      reset(initialData);
-      
-      // Pré-selecionar os valores nos Selects
-      if (initialData.clienteId) {
-        setValue('clienteId', initialData.clienteId);
-      }
-      if (initialData.bancoId) {
-        setValue('bancoId', initialData.bancoId);
-      }
-      if (initialData.tipoContrato) {
-        setValue('tipoContrato', initialData.tipoContrato);
-      }
-      // Garantir que todos os campos sejam preenchidos corretamente
-      if (initialData.valorTotal !== undefined) {
-        setValue('valorTotal', initialData.valorTotal);
-      }
-      if (initialData.dataEmprestimo) {
-        setValue('dataEmprestimo', initialData.dataEmprestimo);
-      }
-      if (initialData.parcelas !== undefined) {
-        setValue('parcelas', initialData.parcelas);
-      }
-      if (initialData.taxa !== undefined) {
-        setValue('taxa', initialData.taxa);
-      }
-      if (initialData.primeiroVencimento) {
-        setValue('primeiroVencimento', initialData.primeiroVencimento);
-      }
-      if (initialData.valorOperacao !== undefined) {
-        setValue('valorOperacao', initialData.valorOperacao);
-      }
-      if (initialData.valorSolicitado !== undefined) {
-        setValue('valorSolicitado', initialData.valorSolicitado);
-      }
-      if (initialData.valorPrestacao !== undefined) {
-        setValue('valorPrestacao', initialData.valorPrestacao);
-      }
-    } else if (mode === 'create') {
-      // Reset para formulário vazio quando for criação
-      const dataAtual = getDataAtual();
-      reset({
-        clienteId: '',
-        bancoId: '',
-        tipoContrato: '',
-        valorTotal: 0,
-        dataEmprestimo: dataAtual, // Preencher automaticamente com a data atual
-        parcelas: 0,
-        taxa: 0,
-        observacoes: '',
-        // Novos campos com valores padrão apropriados
-        primeiroVencimento: dataAtual,
-        valorOperacao: 0,
-        valorSolicitado: 0,
-        valorPrestacao: 0
-      });
-    }
-  }, [initialData, reset, setValue, mode, isOpen]);
-
-  // Função para calcular data de término
-  const calculateEndDate = (startDate: string, numParcelas: number): string => {
-    if (!startDate || !numParcelas || numParcelas <= 0) return '';
-    
-    try {
-      // Converter data DD/MM/AAAA para objeto Date
-      const dateParts = startDate.split('/');
-      if (dateParts.length !== 3) return '';
-      
-      const day = parseInt(dateParts[0]);
-      const month = parseInt(dateParts[1]) - 1; // JavaScript usa meses 0-11
-      const year = parseInt(dateParts[2]);
-      
-      if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
-      
-      const startDateObj = new Date(year, month, day);
-      
-      // Adicionar número de meses (parcelas são mensais)
-      const endDateObj = new Date(startDateObj);
-      endDateObj.setMonth(endDateObj.getMonth() + numParcelas);
-      
-      // Formatar de volta para DD/MM/AAAA
-      const endDay = endDateObj.getDate().toString().padStart(2, '0');
-      const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
-      const endYear = endDateObj.getFullYear();
-      
-      return `${endDay}/${endMonth}/${endYear}`;
-    } catch (error) {
-      return '';
-    }
+  const handleClose = () => {
+    onClose();
   };
 
-  // Calcular data de término automaticamente
-  const dataTermino = calculateEndDate(primeiroVencimento, parcelas);
+  const handleComplete = () => {
+    onClose();
+  };
 
   const handleFormSubmit = async (data: ContratoFormData) => {
-    console.log('Submetendo formulário de contrato', { data, mode });
     setIsSubmitting(true);
     try {
-      // Remover campos de PDF dos dados do formulário antes de enviar
-      const { pdfUrl, pdfName, ...formDataWithoutPdf } = data as any;
-      
-      await onSubmit(formDataWithoutPdf as ContratoFormData);
-      toast.success(mode === 'create' ? 'Contrato cadastrado com sucesso!' : 'Contrato atualizado com sucesso!');
+      await onSubmit(data);
       // Não fechamos o modal automaticamente para permitir upload de PDF
-      // O fechamento será feito pelo usuário quando clicar no botão "Fechar" ou "Concluir"
-      if (mode === 'create') {
-        // Resetar o formulário para criar um novo contrato
-        reset({
-          clienteId: '',
-          bancoId: '',
-          tipoContrato: 'consignado-previdencia' as const,
-          valorTotal: 0,
-          dataEmprestimo: getDataAtual(),
-          parcelas: 0,
-          taxa: 0,
-          observacoes: '',
-          primeiroVencimento: getDataAtual(),
-          valorOperacao: 0,
-          valorSolicitado: 0,
-          valorPrestacao: 0
-        });
-      }
+      // O fechamento será feito pelo usuário quando clicar no botão "Concluir"
     } catch (error) {
-      toast.error('Erro ao salvar contrato. Tente novamente.');
-      console.error('Erro ao salvar contrato:', error);
+      console.error('Erro ao submeter formulário:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    console.log('Fechando modal de contrato via handleClose');
-    reset();
-    onClose();
-  };
-
-  // Nova função para fechar o modal após conclusão
-  const handleComplete = () => {
-    console.log('Fechando modal de contrato via handleComplete');
-    reset();
-    onClose();
-  };
-
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatDate(e.target.value);
-    setValue('dataEmprestimo', formatted);
+    const value = e.target.value;
+    console.log('Alterando data de empréstimo para:', value);
+    // Aplicar máscara de data
+    const maskedValue = formatDate(value);
+    setValue('dataEmprestimo', maskedValue);
   };
 
   const handlePrimeiroVencimentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatDate(e.target.value);
-    setValue('primeiroVencimento', formatted);
+    const value = e.target.value;
+    console.log('Alterando primeiro vencimento para:', value);
+    // Aplicar máscara de data
+    const maskedValue = formatDate(value);
+    setValue('primeiroVencimento', maskedValue);
   };
 
-  // Cálculos automáticos
-  const valorParcela = valorTotal && parcelas ? (valorTotal / parcelas).toFixed(2) : '0';
-  const receitaEstimada = valorTotal && taxa ? (valorTotal * (taxa / 100)).toFixed(2) : '0';
-  
+  // Calcular valor da parcela
+  const valorParcela = valorTotal && parcelas ? (valorTotal / parcelas).toString() : '0';
+
+  // Calcular receita estimada
+  const receitaEstimada = valorTotal && taxa ? (valorTotal * (taxa / 100)).toString() : '0';
+
+  // Calcular data de término
+  const dataTermino = dataEmprestimo && parcelas ? 
+    new Date(
+      parseInt(dataEmprestimo.split('/')[2]),
+      parseInt(dataEmprestimo.split('/')[1]) - 1,
+      parseInt(dataEmprestimo.split('/')[0])
+    ).setMonth(
+      new Date(
+        parseInt(dataEmprestimo.split('/')[2]),
+        parseInt(dataEmprestimo.split('/')[1]) - 1,
+        parseInt(dataEmprestimo.split('/')[0])
+      ).getMonth() + parcelas - 1
+    ) : null;
+
+  const dataTerminoFormatada = dataTermino ? 
+    new Date(dataTermino).toLocaleDateString('pt-BR') : '';
+
   // Prévia da nomenclatura do contrato
-  const previaContratoNome = dataEmprestimo && mode === 'create' 
-    ? getProximoNumeroContrato(contratos, dataEmprestimo)
-    : null;
+  const previaContratoNome = mode === 'create' ? 
+    getProximoNumeroContrato(contratos, getDataAtual()) : 
+    initialData?.id ? 
+      contratos.find(c => c.id === initialData.id)?.id || '' : 
+      '';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log('ContratoFormModal onOpenChange:', open);
       if (!open) {
         handleClose();
       }
@@ -352,18 +404,11 @@ export function ContratoFormModal({
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mode === 'edit'
-                    ? clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome} {cliente.status === 'inativo' ? '(Inativo)' : ''}
-                        </SelectItem>
-                      ))
-                    : clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome} {cliente.status === 'inativo' ? '(Inativo)' : ''}
-                        </SelectItem>
-                      ))
-                  }
+                  {clientes.map((cliente) => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nome} {cliente.status === 'inativo' ? '(Inativo)' : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {errors.clienteId && (
@@ -378,18 +423,11 @@ export function ContratoFormModal({
                   <SelectValue placeholder="Selecione o banco" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mode === 'edit' 
-                    ? bancos.map((banco) => (
-                        <SelectItem key={banco.id} value={banco.id}>
-                          {banco.codigo} - {banco.nome} {banco.status === 'inativo' ? '(Inativo)' : ''}
-                        </SelectItem>
-                      ))
-                    : bancos.map((banco) => (
-                        <SelectItem key={banco.id} value={banco.id}>
-                          {banco.codigo} - {banco.nome} {banco.status === 'inativo' ? '(Inativo)' : ''}
-                        </SelectItem>
-                      ))
-                  }
+                  {bancos.map((banco) => (
+                    <SelectItem key={banco.id} value={banco.id}>
+                      {banco.codigo} - {banco.nome} {banco.status === 'inativo' ? '(Inativo)' : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {errors.bancoId && (
@@ -401,7 +439,10 @@ export function ContratoFormModal({
           {/* Tipo de Contrato */}
           <div className="space-y-2">
             <Label>Tipo de Contrato *</Label>
-            <Select value={tipoContrato || ''} onValueChange={(value) => setValue('tipoContrato', value as ContratoFormData['tipoContrato'])}>
+            <Select 
+              value={tipoContrato || ''} 
+              onValueChange={(value) => setValue('tipoContrato', value as ContratoFormData['tipoContrato'])}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo de contrato" />
               </SelectTrigger>
@@ -411,10 +452,23 @@ export function ContratoFormModal({
                     {tipo.label}
                   </SelectItem>
                 ))}
+                {/* Adicionar opção temporária se o tipo de contrato não estiver na lista */}
+                {tipoContrato && !tiposContrato.some(tipo => tipo.value === tipoContrato) && (
+                  <SelectItem value={tipoContrato} className="text-warning">
+                    {tipoContrato} (Tipo não encontrado)
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
             {errors.tipoContrato && (
               <p className="text-sm text-destructive">{errors.tipoContrato.message}</p>
+            )}
+            {/* Mensagem de aviso se o tipo de contrato não estiver disponível */}
+            {tipoContrato && !tiposContrato.some(tipo => tipo.value === tipoContrato) && (
+              <p className="text-sm text-warning">
+                O tipo de contrato "{tipoContrato}" não está disponível na lista de tipos cadastrados. 
+                Por favor, selecione um tipo válido ou adicione este tipo no gerenciador de tipos de contrato.
+              </p>
             )}
           </div>
 
@@ -488,7 +542,7 @@ export function ContratoFormModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxa">Taxa (%) *</Label>
+              <Label htmlFor="taxa">Taxa de Comissão (%) *</Label>
               <div className="relative">
                 <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -509,7 +563,7 @@ export function ContratoFormModal({
 
           {/* Receita Estimada */}
           <div className="space-y-2">
-            <Label>Sua Receita Estimada</Label>
+            <Label>Minha Comissão</Label>
             <Input
               type="text"
               readOnly
@@ -546,7 +600,7 @@ export function ContratoFormModal({
                   type="text"
                   readOnly
                   className="pl-9"
-                  value={dataTermino}
+                  value={dataTerminoFormatada}
                 />
               </div>
             </div>

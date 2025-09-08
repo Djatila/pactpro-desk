@@ -68,9 +68,10 @@ interface ContratoDetailModalProps {
   onClose: () => void;
   contrato: Contrato | null;
   todosContratos: Contrato[]; // Adicionar todos os contratos para gerar nomenclatura
+  tiposContrato?: { value: string; label: string }[]; // Adicionar tipos de contrato
 }
 
-export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos }: ContratoDetailModalProps) {
+export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos, tiposContrato }: ContratoDetailModalProps) {
   if (!contrato) return null;
 
   // Calcular data de término com base na data do empréstimo e número de parcelas
@@ -81,7 +82,6 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log('ContratoDetailModal onOpenChange:', open);
       if (!open) {
         onClose();
       }
@@ -159,7 +159,7 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
                   <Tag className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Natureza</p>
-                    <p className="font-medium text-primary">{getTipoContratoLabel(contrato.tipoContrato)}</p>
+                    <p className="font-medium text-primary">{getTipoContratoLabel(contrato.tipoContrato, tiposContrato)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -205,7 +205,7 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos 
                     <Hash className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Parcelas</p>
-                      <p className="font-medium">{contrato.parcelas}x de {contrato.valorParcela}</p>
+                      <span className="font-medium">{contrato.parcelas}x {contrato.valorParcela}</span>
                     </div>
                   </div>
                 </CardContent>

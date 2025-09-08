@@ -23,10 +23,12 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
 
   // Função para lidar com o upload de PDF
   const handlePdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('PDF change triggered');
+    // Removido log para evitar loop infinito
+    // console.log('PDF change triggered');
     const file = e.target.files?.[0];
     if (file) {
-      console.log('File selected:', file.name);
+      // Removido log para evitar loop infinito
+      // console.log('File selected:', file.name);
       // Verificar se é um PDF
       if (file.type !== 'application/pdf') {
         toast.error('Por favor, selecione um arquivo PDF válido.');
@@ -56,7 +58,8 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
 
   // Função para fazer upload do PDF
   const handleUploadPdf = async (file: File) => {
-    console.log('Starting PDF upload for contrato:', contratoId);
+    // Removido log para evitar loop infinito
+    // console.log('Starting PDF upload for contrato:', contratoId);
     setShowStorageAlert(false); // Ocultar alerta anterior
     setLastError(null); // Limpar erro anterior
     try {
