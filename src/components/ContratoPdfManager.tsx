@@ -6,6 +6,7 @@ import { File, Upload, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { StorageConfigAlert } from '@/components/StorageConfigAlert';
 import { ErrorMessageDisplay } from '@/components/ErrorMessageDisplay';
+import { supabase } from '@/lib/supabase'; // Importar supabase para o filtro de user_id
 
 interface ContratoPdfManagerProps {
   contratoId: string;

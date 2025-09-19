@@ -19,7 +19,8 @@ import {
   Calendar,
   Building2,
   BarChart3,
-  UserPlus
+  UserPlus,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +28,7 @@ export default function Dashboard() {
   const [isContratoModalOpen, setIsContratoModalOpen] = useState(false);
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
   const [isBancoModalOpen, setIsBancoModalOpen] = useState(false);
-  const { clientes, contratos, addContrato, addCliente, addBanco } = useData();
+  const { clientes, contratos, addContrato, addCliente, addBanco, isLoading: isDataLoading } = useData();
   const navigate = useNavigate();
 
   // Obter clientes mais recentes (ordenados por ID que representa ordem de cadastro)
@@ -137,6 +138,15 @@ export default function Dashboard() {
     if (posicao === 3) return '3 dias';
     return `${posicao} dias`;
   };
+
+  if (isDataLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-3 text-muted-foreground">Carregando dados...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

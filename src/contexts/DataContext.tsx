@@ -198,6 +198,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
+        .eq('user_id', user?.id) // Adicionar filtro por user_id
         .order('nome');
 
       if (error) throw error;
@@ -228,6 +229,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const { data, error } = await supabase
         .from('bancos')
         .select('*')
+        .eq('user_id', user?.id) // Adicionar filtro por user_id
         .order('nome');
 
       if (error) throw error;
@@ -262,6 +264,7 @@ export function DataProvider({ children }: DataProviderProps) {
           clientes!contratos_cliente_id_fkey(nome),
           bancos!contratos_banco_id_fkey(nome)
         `)
+        .eq('user_id', user?.id) // Adicionar filtro por user_id
         .order('data_emprestimo', { ascending: false });
 
       if (error) throw error;
@@ -478,7 +481,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('clientes')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -504,7 +508,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('clientes')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -575,7 +580,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('bancos')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -602,7 +608,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('bancos')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -700,7 +707,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('contratos')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -870,7 +878,8 @@ export function DataProvider({ children }: DataProviderProps) {
             pdf_url: urlData.publicUrl,
             pdf_name: file.name
           })
-          .eq('id', contratoId);
+          .eq('id', contratoId)
+          .eq('user_id', user.id); // Adicionar filtro por user_id
 
         if (updateError) {
           console.error('Erro ao atualizar contrato com PDF:', updateError);
@@ -884,7 +893,8 @@ export function DataProvider({ children }: DataProviderProps) {
             pdf_url: null,
             pdf_name: null
           })
-          .eq('id', contratoId);
+          .eq('id', contratoId)
+          .eq('user_id', user.id); // Adicionar filtro por user_id
 
         if (updateError) {
           console.error('Erro ao remover PDF do contrato:', updateError);
@@ -921,6 +931,7 @@ export function DataProvider({ children }: DataProviderProps) {
           bancos!contratos_banco_id_fkey(nome)
         `)
         .eq('id', contratoId)
+        .eq('user_id', user?.id) // Adicionar filtro por user_id
         .single();
 
       if (error) throw error;
@@ -1044,7 +1055,8 @@ export function DataProvider({ children }: DataProviderProps) {
       const { error } = await supabase
         .from('contratos')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -1245,7 +1257,7 @@ export function DataProvider({ children }: DataProviderProps) {
         .from('tipos_contrato')
         .update(tipoData)
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
@@ -1283,7 +1295,7 @@ export function DataProvider({ children }: DataProviderProps) {
         .from('tipos_contrato')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id); // Adicionar filtro por user_id
 
       if (error) throw error;
 
