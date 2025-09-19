@@ -263,8 +263,8 @@ export default function Contratos() {
     } else if (mesesRestantes === 5) {
       animationDuration = '1.5s';
     } else if (mesesRestantes === 6) {
-      colorClass = 'bg-green-500'; // Manter verde para 6 meses
-      animationDuration = '1.5s'; // Mais lento para 6 meses, mas perceptível
+      colorClass = 'bg-yellow-500'; // Amarelo para 6 meses
+      animationDuration = '1s'; // Mais rápido para 6 meses
     }
 
     return {
