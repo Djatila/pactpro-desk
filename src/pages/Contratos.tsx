@@ -522,7 +522,7 @@ export default function Contratos() {
                     disabled={!contrato.pdfUrl}
                     className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                   >
-                    <Download className="h-4 w-4 mr-1" />
+                    <Download className="h-3 w-3 mr-1" />
                     PDF
                   </Button>
                 </div>
