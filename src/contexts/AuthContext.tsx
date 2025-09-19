@@ -48,42 +48,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [error, setError] = useState<string | null>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
+  // Função auxiliar para adicionar timeout a uma Promise
+  const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+    let timeoutId: NodeJS.Timeout;
+    const timeout = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+  };
+
   // Verificar sessão do usuário e carregar perfil
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
 
     const getSession = async () => {
       try {
-        // Removido log para evitar loop infinito
-        // console.log('🔍 Iniciando verificação de sessão...');
+        console.log('🔍 Iniciando verificação de sessão...');
         
-        // Timeout aumentado para PCs com conectividade mais lenta (25 segundos)
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            console.error('❌ Timeout atingido na verificação de sessão do Supabase.');
-            reject(new Error('Timeout na verificação de sessão'));
-          }, 25000); // Aumentado de 15s para 25s para maior tolerância
-        });
-
         // Verificação inicial rápida - tentar localStorage primeiro
         if (!initialCheckDone) {
           try {
             const storedUser = localStorage.getItem('maiacred_user');
             if (storedUser) {
               const parsedUser = JSON.parse(storedUser);
-              // Removido log para evitar loop infinito
-              // console.log('✅ Usuário encontrado no localStorage:', parsedUser.email);
+              console.log('✅ Usuário encontrado no localStorage:', parsedUser.email);
               setUser(parsedUser);
               setIsLoading(false);
               setInitialCheckDone(true);
-              // Verificar sessão em background após um curto delay
-              // Removido para evitar loop infinito
-              // setTimeout(() => {
-              //   if (isMounted) {
-              //     getSession();
-              //   }
-              // }, 500);
               return;
             }
           } catch (error) {
@@ -101,25 +92,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
-        // Removido log para evitar loop infinito
-        // console.log('🔄 Verificando sessão no Supabase...');
+        console.log('🔄 Verificando sessão no Supabase...');
         
-        // Tentar obter a sessão com múltiplas tentativas em caso de falha
-        let sessionResult;
+        let sessionResult: any;
         let attempt = 0;
         const maxAttempts = 3;
-        
+        const sessionTimeoutMs = 30000; // 30 segundos para a verificação de sessão
+
         while (attempt < maxAttempts) {
           try {
-            const sessionPromise = supabase.auth.getSession();
-            sessionResult = await Promise.race([
-              sessionPromise,
-              timeoutPromise
-            ]);
+            sessionResult = await withTimeout(
+              supabase.auth.getSession(),
+              sessionTimeoutMs,
+              'Timeout na verificação de sessão do Supabase.'
+            );
             break; // Se sucesso, sair do loop
-          } catch (error) {
+          } catch (error: any) {
             attempt++;
-            console.warn(`Tentativa ${attempt} de obter sessão falhou:`, error);
+            console.warn(`Tentativa ${attempt} de obter sessão falhou:`, error.message);
             if (attempt >= maxAttempts) {
               throw error; // Se todas as tentativas falharem, lançar o erro
             }
@@ -127,14 +117,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
           }
         }
-
-        clearTimeout(timeoutId);
         
         if (!sessionResult) {
           throw new Error('Não foi possível obter a sessão');
         }
 
-        const { data: { session }, error } = sessionResult as any;
+        const { data: { session }, error } = sessionResult;
         
         if (error) {
           console.error('Erro ao obter sessão:', error);
@@ -143,16 +131,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (session?.user && isMounted) {
-          // Removido log para evitar loop infinito
-          // console.log('✅ Sessão ativa encontrada:', session.user.email);
+          console.log('✅ Sessão ativa encontrada:', session.user.email);
           
           // Buscar perfil do usuário
           try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
+            const { data: profile, error: profileError } = await withTimeout(
+              supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+              5000, // 5 segundos para carregar o perfil
+              'Timeout ao carregar perfil do usuário.'
+            );
 
             if (profileError) {
               console.warn('⚠️ Erro ao buscar perfil:', profileError);
@@ -171,15 +158,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 nome: profile.nome || session.user.email?.split('@')[0] || 'Usuário',
                 email: profile.email || session.user.email || '',
                 cargo: profile.cargo || 'Usuário',
-                avatar: profile.avatar
+                avatar: profile.avatar_url
               };
               setUser(userData);
               localStorage.setItem('maiacred_user', JSON.stringify(userData));
-              // Removido log para evitar loop infinito
-              // console.log('✅ Perfil carregado:', userData.nome);
+              console.log('✅ Perfil carregado:', userData.nome);
             }
-          } catch (profileError) {
-            console.error('❌ Erro ao buscar perfil:', profileError);
+          } catch (profileError: any) {
+            console.error('❌ Erro ao buscar perfil:', profileError.message);
             // Fallback para usuário básico
             const basicUser: User = {
               id: session.user.id,
@@ -191,8 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
           }
         } else {
-          // Removido log para evitar loop infinito
-          // console.log('ℹ️ Nenhuma sessão ativa encontrada');
+          console.log('ℹ️ Nenhuma sessão ativa encontrada');
           localStorage.removeItem('maiacred_user');
         }
 
@@ -200,10 +185,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setIsLoading(false);
         }
         
-      } catch (error) {
-        console.error('❌ Erro crítico na verificação de sessão:', error);
+      } catch (error: any) {
+        console.error('❌ Erro crítico na verificação de sessão:', error.message);
         if (isMounted) {
-          setError('Erro na verificação de autenticação');
+          setError(error.message);
           setIsLoading(false);
           // Limpar dados em caso de erro
           localStorage.removeItem('maiacred_user');
@@ -217,16 +202,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Cleanup
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
   }, []);
 
   const loadUserProfile = async (userId: string) => {
     try {
-      // Removido log para evitar loop infinito
-      // console.log('Carregando perfil do usuário:', userId);
+      console.log('Carregando perfil do usuário:', userId);
       
       // Criar perfil básico IMEDIATAMENTE sem aguardar nenhuma chamada async
       const basicUserData = {
@@ -237,15 +218,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         avatar: undefined
       };
       
-      // Removido log para evitar loop infinito
-      // console.log('✅ Definindo usuário IMEDIATAMENTE:', basicUserData);
+      console.log('✅ Definindo usuário IMEDIATAMENTE:', basicUserData);
       setUser(basicUserData);
       
       // Salvar no localStorage
       try {
         localStorage.setItem('maiacred_user', JSON.stringify(basicUserData));
-        // Removido log para evitar loop infinito
-        // console.log('✅ Dados salvos no localStorage');
+        console.log('✅ Dados salvos no localStorage');
       } catch (error) {
         console.warn('Erro ao salvar no localStorage:', error);
       }
@@ -253,21 +232,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Tentar melhorar os dados em background SEM bloquear
       setTimeout(async () => {
         try {
-          // Removido log para evitar loop infinito
-          // console.log('🔄 Tentando carregar dados do usuário em background...');
+          console.log('🔄 Tentando carregar dados do usuário em background...');
           
-          // Timeout muito agressivo para getUser
-          const getUserPromise = supabase.auth.getUser();
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error('Timeout getUser'));
-            }, 2000); // 2 segundos
-          });
-          
-          const { data: { user } } = await Promise.race([
-            getUserPromise,
-            timeoutPromise
-          ]) as any;
+          const { data: { user } } = await withTimeout(
+            supabase.auth.getUser(),
+            5000, // 5 segundos para getUser
+            'Timeout ao obter dados do usuário em background.'
+          );
           
           if (user && user.email) {
             const improvedUserData = {
@@ -278,37 +249,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
               avatar: user.user_metadata?.avatar || undefined
             };
             
-            // Removido log para evitar loop infinito
-            // console.log('✅ Dados melhorados obtidos:', improvedUserData);
+            console.log('✅ Dados melhorados obtidos:', improvedUserData);
             setUser(improvedUserData);
             localStorage.setItem('maiacred_user', JSON.stringify(improvedUserData));
           }
-        } catch (userError) {
-          // Removido log para evitar loop infinito
-          // console.log('⚠️ Não foi possível melhorar dados do usuário:', userError);
+        } catch (userError: any) {
+          console.log('⚠️ Não foi possível melhorar dados do usuário:', userError.message);
         }
         
         // Tentar carregar perfil da tabela profiles
         try {
-          // Removido log para evitar loop infinito
-          // console.log('🔄 Tentando carregar perfil da tabela...');
+          console.log('🔄 Tentando carregar perfil da tabela...');
           
-          const profilePromise = supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-            
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error('Timeout profile'));
-            }, 2000); // 2 segundos
-          });
-
-          const { data: profile, error } = await Promise.race([
-            profilePromise,
-            timeoutPromise
-          ]) as any;
+          const { data: profile, error } = await withTimeout(
+            supabase.from('profiles').select('*').eq('id', userId).single(),
+            5000, // 5 segundos para carregar perfil da tabela
+            'Timeout ao carregar perfil da tabela.'
+          );
 
           if (!error && profile) {
             const completeUserData = {
@@ -319,19 +276,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
               avatar: profile.avatar_url || undefined
             };
             
-            // Removido log para evitar loop infinito
-            // console.log('✅ Perfil completo carregado:', completeUserData);
+            console.log('✅ Perfil completo carregado:', completeUserData);
             setUser(completeUserData);
             localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
           }
-        } catch (profileError) {
-          // Removido log para evitar loop infinito
-          // console.log('⚠️ Perfil da tabela não disponível:', profileError);
+        } catch (profileError: any) {
+          console.log('⚠️ Perfil da tabela não disponível:', profileError.message);
         }
       }, 100); // Executar após 100ms
       
     } catch (error: any) {
-      console.error('Erro crítico ao carregar perfil:', error);
+      console.error('Erro crítico ao carregar perfil:', error.message);
       
       // Mesmo com erro, garantir que o usuário seja definido
       const emergencyUserData = {
@@ -342,8 +297,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         avatar: undefined
       };
       
-      // Removido log para evitar loop infinito
-      // console.log('🚨 Usando dados de emergência:', emergencyUserData);
+      console.log('🚨 Usando dados de emergência:', emergencyUserData);
       setUser(emergencyUserData);
       
       try {
@@ -359,23 +313,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     
     try {
-      // Removido log para evitar loop infinito
-      // console.log('Tentando registrar usuário:', data.email);
+      console.log('Tentando registrar usuário:', data.email);
       
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            nome: data.nome,
-            cargo: data.cargo
-          },
-          emailRedirectTo: undefined // Desabilita redirecionamento por email
-        }
-      });
+      const { data: authData, error: authError } = await withTimeout(
+        supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              nome: data.nome,
+              cargo: data.cargo
+            },
+            emailRedirectTo: undefined // Desabilita redirecionamento por email
+          }
+        }),
+        15000, // 15 segundos para registro
+        'Timeout ao registrar usuário.'
+      );
 
-      // Removido log para evitar loop infinito
-      // console.log('Resposta do registro:', { authData, authError });
+      console.log('Resposta do registro:', { authData, authError });
 
       if (authError) {
         console.error('Erro de autenticação:', authError);
@@ -406,21 +362,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (authData.user) {
-        // Removido log para evitar loop infinito
-        // console.log('Usuário criado:', authData.user);
+        console.log('Usuário criado:', authData.user);
         
         // Verificar se o usuário foi confirmado automaticamente
         if (authData.user.email_confirmed_at) {
-          // Removido log para evitar loop infinito
-          // console.log('Usuário confirmado automaticamente');
+          console.log('Usuário confirmado automaticamente');
           try {
             await loadUserProfile(authData.user.id);
           } catch (profileError) {
             console.error('Erro no carregamento do perfil após registro:', profileError);
           }
         } else {
-          // Removido log para evitar loop infinito
-          // console.log('Usuário criado mas não confirmado. Fazendo login direto...');
+          console.log('Usuário criado mas não confirmado. Fazendo login direto...');
           // Se não foi confirmado, mas existe, tentar fazer login direto
           // Isso é útil se a confirmação de email estiver desabilitada
           const loginResult = await login(data.email, data.password);
@@ -436,9 +389,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       setIsLoading(false);
       return false;
-    } catch (error) {
-      console.error('Erro no registro:', error);
-      setError('Erro inesperado durante o registro');
+    } catch (error: any) {
+      console.error('Erro no registro:', error.message);
+      setError(error.message || 'Erro inesperado durante o registro');
       setIsLoading(false);
       return false;
     }
@@ -449,16 +402,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     
     try {
-      // Removido log para evitar loop infinito
-      // console.log('Tentando fazer login com:', email);
+      console.log('Tentando fazer login com:', email);
       
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password
-      });
+      const { data: authData, error: authError } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password
+        }),
+        15000, // 15 segundos para login
+        'Timeout ao fazer login.'
+      );
 
-      // Removido log para evitar loop infinito
-      // console.log('Resposta do login:', { authData, authError });
+      console.log('Resposta do login:', { authData, authError });
 
       if (authError) {
         console.error('Erro de autenticação:', authError);
@@ -502,8 +457,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (authData.user) {
-        // Removido log para evitar loop infinito
-        // console.log('Login bem-sucedido. Criando usuário com dados do login...');
+        console.log('Login bem-sucedido. Criando usuário com dados do login...');
         
         // Criar usuário IMEDIATAMENTE com dados do login
         const loginUserData = {
@@ -514,15 +468,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           avatar: authData.user.user_metadata?.avatar || undefined
         };
         
-        // Removido log para evitar loop infinito
-        // console.log('✅ Definindo usuário com dados do login:', loginUserData);
+        console.log('✅ Definindo usuário com dados do login:', loginUserData);
         setUser(loginUserData);
         
         // Salvar no localStorage
         try {
           localStorage.setItem('maiacred_user', JSON.stringify(loginUserData));
-          // Removido log para evitar loop infinito
-          // console.log('✅ Dados do login salvos no localStorage');
+          console.log('✅ Dados do login salvos no localStorage');
         } catch (error) {
           console.warn('Erro ao salvar dados do login no localStorage:', error);
         }
@@ -530,25 +482,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Tentar melhorar dados em background (sem bloquear)
         setTimeout(async () => {
           try {
-            // Removido log para evitar loop infinito
-            // console.log('🔄 Tentando carregar perfil completo da tabela em background...');
+            console.log('🔄 Tentando carregar perfil completo da tabela em background...');
             
-            const profilePromise = supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', authData.user.id)
-              .single();
-              
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => {
-                reject(new Error('Timeout profile background'));
-              }, 3000); // 3 segundos para background
-            });
-
-            const { data: profile, error } = await Promise.race([
-              profilePromise,
-              timeoutPromise
-            ]) as any;
+            const { data: profile, error } = await withTimeout(
+              supabase.from('profiles').select('*').eq('id', authData.user.id).single(),
+              5000, // 5 segundos para background
+              'Timeout ao carregar perfil em background.'
+            );
 
             if (!error && profile) {
               const completeUserData = {
@@ -559,17 +499,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 avatar: profile.avatar_url || undefined
               };
               
-              // Removido log para evitar loop infinito
-              // console.log('✅ Perfil completo carregado em background:', completeUserData);
+              console.log('✅ Perfil completo carregado em background:', completeUserData);
               setUser(completeUserData);
               localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
             } else {
-              // Removido log para evitar loop infinito
-              // console.log('⚠️ Perfil da tabela não disponível, mantendo dados do login');
+              console.log('⚠️ Perfil da tabela não disponível, mantendo dados do login');
             }
-          } catch (profileError) {
-            // Removido log para evitar loop infinito
-            // console.log('⚠️ Erro no carregamento do perfil em background, mantendo dados do login:', profileError);
+          } catch (profileError: any) {
+            console.log('⚠️ Erro no carregamento do perfil em background, mantendo dados do login:', profileError.message);
           }
         }, 200); // Executar após 200ms
         
@@ -579,9 +516,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       setIsLoading(false);
       return false;
-    } catch (error) {
-      console.error('Erro no login:', error);
-      setError('Erro inesperado durante o login');
+    } catch (error: any) {
+      console.error('Erro no login:', error.message);
+      setError(error.message || 'Erro inesperado durante o login');
       setIsLoading(false);
       return false;
     }
@@ -598,40 +535,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Limpar localStorage imediatamente
       try {
         localStorage.removeItem('maiacred_user');
-        // Removido log para evitar loop infinito
-        // console.log('✓ Dados locais limpos com sucesso');
+        console.log('✓ Dados locais limpos com sucesso');
       } catch (error) {
         console.warn('Erro ao limpar localStorage:', error);
       }
       
       // Tentar fazer logout no Supabase com timeout menor
-      const logoutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Timeout no logout'));
-        }, 3000); // Timeout de apenas 3 segundos
-      });
-      
       try {
-        const { error } = await Promise.race([
-          logoutPromise,
-          timeoutPromise
-        ]) as any;
+        const { error } = await withTimeout(
+          supabase.auth.signOut(),
+          3000, // Timeout de apenas 3 segundos
+          'Timeout no logout do Supabase.'
+        );
         
         if (error) {
           console.warn('Aviso no logout do Supabase:', error.message);
           // Não definir como erro crítico, pois dados locais já foram limpos
         } else {
-          // Removido log para evitar loop infinito
-          // console.log('✓ Logout do Supabase realizado com sucesso');
+          console.log('✓ Logout do Supabase realizado com sucesso');
         }
-      } catch (timeoutError) {
-        console.warn('⚠️ Timeout no logout do Supabase, mas dados locais foram limpos');
+      } catch (timeoutError: any) {
+        console.warn('⚠️ Timeout no logout do Supabase, mas dados locais foram limpos:', timeoutError.message);
         // Continuar normalmente, dados locais já foram limpos
       }
       
-    } catch (error) {
-      console.error('Erro no logout:', error);
+    } catch (error: any) {
+      console.error('Erro no logout:', error.message);
       // Mesmo com erro, garantir que usuário seja deslogado localmente
       setUser(null);
       try {
@@ -642,8 +571,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError('Logout realizado localmente. Pode haver problemas de conectividade.');
     } finally {
       setIsLoading(false);
-      // Removido log para evitar loop infinito
-      // console.log('🔓 Logout finalizado - usuário desconectado');
+      console.log('🔓 Logout finalizado - usuário desconectado');
     }
   };
 
