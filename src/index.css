@@ -127,3 +127,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animação de fade-blink */
+@keyframes fade-blink {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}

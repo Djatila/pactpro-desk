@@ -244,6 +244,34 @@ export default function Contratos() {
     return ""; // Sem sombreamento especial
   };
 
+  // Função para obter a classe do indicador de piscar
+  const getBlinkIndicatorClass = (mesesRestantes: number) => {
+    if (mesesRestantes <= 0 || mesesRestantes > 6) return null; // Não exibir se já venceu ou muito longe
+
+    let colorClass = 'bg-green-500'; // Padrão verde
+    let animationDuration = '2s'; // Padrão lento
+
+    if (mesesRestantes === 1) {
+      colorClass = 'bg-red-500';
+      animationDuration = '0.5s'; // Mais rápido
+    } else if (mesesRestantes === 2) {
+      animationDuration = '0.8s';
+    } else if (mesesRestantes === 3) {
+      animationDuration = '1s';
+    } else if (mesesRestantes === 4) {
+      animationDuration = '1.2s';
+    } else if (mesesRestantes === 5) {
+      animationDuration = '1.5s';
+    } else if (mesesRestantes === 6) {
+      animationDuration = '2s'; // Mais lento
+    }
+
+    return {
+      className: `w-2 h-2 rounded-full ${colorClass} animate-fade-blink`,
+      style: { animationDuration }
+    };
+  };
+
   const totalReceita = contratos
     .filter(c => c.status === "ativo" || c.status === "finalizado")
     .reduce((acc, c) => {
@@ -404,140 +432,152 @@ export default function Contratos() {
 
       {/* Contracts List */}
       <div className="grid gap-4">
-        {filteredContratos.map((contrato) => (
-          <Card 
-            key={contrato.id} 
-            className={cn(
-              "shadow-card hover:shadow-card-hover transition-all",
-              getCardShadingClass(contrato.mesesRestantes)
-            )}
-          >
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex-1 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-primary-dark">
-                        {formatContratoNome(contratos, contrato)}
-                      </h3>
-                      <div className="flex items-center gap-4 mt-1">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <User className="h-4 w-4" />
-                          {contrato.clienteNome}
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Building2 className="h-4 w-4" />
-                          {contrato.bancoNome}
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <FileText className="h-4 w-4" />
-                          {getTipoContratoLabel(contrato.tipoContrato, tiposContrato)}
+        {filteredContratos.map((contrato) => {
+          const blinkIndicator = getBlinkIndicatorClass(contrato.mesesRestantes);
+          return (
+            <Card 
+              key={contrato.id} 
+              className={cn(
+                "shadow-card hover:shadow-card-hover transition-all",
+                getCardShadingClass(contrato.mesesRestantes)
+              )}
+            >
+              <CardContent className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-primary-dark">
+                          {formatContratoNome(contratos, contrato)}
+                        </h3>
+                        <div className="flex items-center gap-4 mt-1">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <User className="h-4 w-4" />
+                            {contrato.clienteNome}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Building2 className="h-4 w-4" />
+                            {contrato.bancoNome}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <FileText className="h-4 w-4" />
+                            {getTipoContratoLabel(contrato.tipoContrato, tiposContrato)}
+                          </div>
                         </div>
                       </div>
+                      <Badge 
+                        variant="secondary"
+                        className={getStatusColor(contrato.status)}
+                      >
+                        {contrato.status === "ativo" ? "Ativo" : 
+                         contrato.status === "pendente" ? "Pendente" : "Finalizado"}
+                      </Badge>
                     </div>
-                    <Badge 
-                      variant="secondary"
-                      className={getStatusColor(contrato.status)}
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="bg-accent/50 p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Data do Empréstimo</p>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          <span className="font-medium">{contrato.dataEmprestimo}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-accent/50 p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-success" />
+                          <span className="font-bold text-success">
+                            R$ {contrato.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-accent/50 p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">
+                            {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
+                          </span>
+                          {blinkIndicator && (
+                            <span 
+                              className={blinkIndicator.className} 
+                              style={blinkIndicator.style}
+                              title={`Faltam ${contrato.mesesRestantes} meses para o contrato terminar`}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-accent/50 p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Sua Receita</p>
+                        <span className="font-bold text-primary">{contrato.receitaAgente}</span>
+                      </div>
+                    </div>
+
+                    {contrato.observacoes && (
+                      <div className="bg-accent/30 p-3 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Observações:</p>
+                        <p className="text-sm">{contrato.observacoes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleViewContrato(contrato)}
+                        title="Visualizar detalhes"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => openEditModal(contrato)}
+                        title="Editar contrato"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteContrato(contrato)}
+                        title="Excluir contrato"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDownloadContrato(contrato)}
+                      disabled={!contrato.pdfUrl}
+                      className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                     >
-                      {contrato.status === "ativo" ? "Ativo" : 
-                       contrato.status === "pendente" ? "Pendente" : "Finalizado"}
-                    </Badge>
+                      <Download className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
                   </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-accent/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Data do Empréstimo</p>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{contrato.dataEmprestimo}</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-accent/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-success" />
-                        <span className="font-bold text-success">
-                          R$ {contrato.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-accent/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
-                      <span className="font-medium">
-                        {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
-                      </span>
-                    </div>
-
-                    <div className="bg-accent/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Sua Receita</p>
-                      <span className="font-bold text-primary">{contrato.receitaAgente}</span>
-                    </div>
-                  </div>
-
-                  {contrato.observacoes && (
-                    <div className="bg-accent/30 p-3 rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-1">Observações:</p>
-                      <p className="text-sm">{contrato.observacoes}</p>
+                
+                  {/* PDF Status Indicator */}
+                  {contrato.pdfUrl && (
+                    <div className="flex items-center gap-2 text-sm text-success mt-2">
+                      <File className="h-4 w-4" />
+                      <span>Documento PDF anexado</span>
                     </div>
                   )}
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => handleViewContrato(contrato)}
-                      title="Visualizar detalhes"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => openEditModal(contrato)}
-                      title="Editar contrato"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteContrato(contrato)}
-                      title="Excluir contrato"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDownloadContrato(contrato)}
-                    disabled={!contrato.pdfUrl}
-                    className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
-                  >
-                    <Download className="h-2 w-2 mr-1" />
-                    PDF
-                  </Button>
-                </div>
-              
-                {/* PDF Status Indicator */}
-                {contrato.pdfUrl && (
-                  <div className="flex items-center gap-2 text-sm text-success mt-2">
-                    <File className="h-4 w-4" />
-                    <span>PDF anexado</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {filteredContratos.length === 0 && (
