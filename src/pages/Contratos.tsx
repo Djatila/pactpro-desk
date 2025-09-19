@@ -265,7 +265,7 @@ export default function Contratos() {
     }
 
     return {
-      className: `w-2 h-2 rounded-full bg-green-500 border border-green-700 animate-fade-blink`, // Sempre verde, com borda
+      className: `w-3 h-3 rounded-full bg-green-500 border border-green-700 animate-fade-blink`, // Sempre verde, com borda
       style: { animationDuration }
     };
   };

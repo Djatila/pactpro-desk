@@ -130,6 +130,6 @@
 
 /* Animação de fade-blink */
 @keyframes fade-blink {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.4; } /* Opacidade inicial e final mais alta */
+  50% { opacity: 0.9; }    /* Opacidade máxima um pouco mais baixa para um fade leve */
 }
