@@ -259,7 +259,7 @@ export default function Contratos() {
     }
 
     return {
-      className: `w-3 h-3 rounded-full bg-green-500 border border-green-700 ${animationClass}`,
+      className: `w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 ${animationClass}`, // Sempre verde, com borda
       style: {} // Não precisamos mais do inline style para animationDuration
     };
   };
