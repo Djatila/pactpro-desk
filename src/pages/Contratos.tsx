@@ -494,11 +494,8 @@ export default function Contratos() {
                       </div>
 
                       <div className="bg-accent/50 p-3 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">
-                            {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
-                          </span>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          Parcelas
                           {blinkIndicator && (
                             <span 
                               className={blinkIndicator.className} 
@@ -506,7 +503,10 @@ export default function Contratos() {
                               title={`Faltam ${contrato.mesesRestantes} meses para o contrato terminar`}
                             />
                           )}
-                        </div>
+                        </p>
+                        <span className="font-medium">
+                          {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
+                        </span>
                       </div>
 
                       <div className="bg-accent/50 p-3 rounded-lg">
@@ -550,34 +550,33 @@ export default function Contratos() {
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => handleDeleteContrato(contrato)}
                         title="Excluir contrato"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDownloadContrato(contrato)}
-                      disabled={!contrato.pdfUrl}
-                      className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                     >
-                      <Download className="h-4 w-4 mr-1" />
-                      PDF
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                
-                  {/* PDF Status Indicator */}
-                  {contrato.pdfUrl && (
-                    <div className="flex items-center gap-2 text-sm text-success mt-2">
-                      <File className="h-4 w-4" />
-                      <span>Documento PDF anexado</span>
-                    </div>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDownloadContrato(contrato)}
+                    disabled={!contrato.pdfUrl}
+                    className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    PDF
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+              
+                {/* PDF Status Indicator */}
+                {contrato.pdfUrl && (
+                  <div className="flex items-center gap-2 text-sm text-success mt-2">
+                    <File className="h-4 w-4" />
+                    <span>Documento PDF anexado</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {filteredContratos.length === 0 && (
