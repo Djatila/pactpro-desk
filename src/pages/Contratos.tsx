@@ -28,6 +28,7 @@ import {
   File
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils"; // Importar cn para classes condicionais
 
 export default function Contratos() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,7 +38,7 @@ export default function Contratos() {
   const [deletingContrato, setDeletingContrato] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isTipoManagerModalOpen, setIsTipoManagerModalOpen] = useState(false);
+  const [isTipoManagerModalOpen, setIsTipoManagerModal] = useState(false);
   const [searchParams] = useSearchParams();
   const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf, loadTiposContrato } = useData();
   // Estado para os tipos de contrato
@@ -191,15 +192,37 @@ export default function Contratos() {
     setTiposContrato(novosTipos);
   };
 
-  const filteredContratos = contratos.filter(contrato => {
-    const matchesSearch = contrato.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contrato.bancoNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contrato.valorTotal.toString().includes(searchTerm.replace(/[R$.,\s]/g, ""));
-    
-    const matchesBanco = bancoFilter ? contrato.bancoId === bancoFilter : true;
-    
-    return matchesSearch && matchesBanco;
-  });
+  const filteredContratos = contratos
+    .filter(contrato => {
+      const matchesSearch = contrato.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.bancoNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.valorTotal.toString().includes(searchTerm.replace(/[R$.,\s]/g, ""));
+      
+      const matchesBanco = bancoFilter ? contrato.bancoId === bancoFilter : true;
+      
+      return matchesSearch && matchesBanco;
+    })
+    .sort((a, b) => {
+      // Ordenação prioritária por meses restantes (menor para maior)
+      // Contratos com 1 mês para vencer primeiro, depois 2, etc.
+      const mesesA = a.mesesRestantes;
+      const mesesB = b.mesesRestantes;
+
+      // Priorizar contratos com 1 a 6 meses restantes
+      const isAEndingSoon = mesesA >= 1 && mesesA <= 6;
+      const isBEndingSoon = mesesB >= 1 && mesesB <= 6;
+
+      if (isAEndingSoon && !isBEndingSoon) return -1; // A vem antes de B
+      if (!isAEndingSoon && isBEndingSoon) return 1;  // B vem antes de A
+
+      // Se ambos estão no período de 1-6 meses ou ambos fora, ordenar por meses restantes
+      if (mesesA !== mesesB) {
+        return mesesA - mesesB;
+      }
+      
+      // Se meses restantes forem iguais, ordenar por ID para estabilidade
+      return a.id.localeCompare(b.id);
+    });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -208,6 +231,17 @@ export default function Contratos() {
       case "finalizado": return "bg-info text-info-foreground";
       default: return "";
     }
+  };
+
+  // Função para determinar a classe de sombreamento do card
+  const getCardShadingClass = (mesesRestantes: number) => {
+    if (mesesRestantes <= 1 && mesesRestantes > 0) {
+      return "bg-destructive/10 border-destructive/20"; // Levemente vermelho
+    }
+    if (mesesRestantes >= 3 && mesesRestantes <= 6) {
+      return "bg-warning/10 border-warning/20"; // Levemente amarelo
+    }
+    return ""; // Sem sombreamento especial
   };
 
   const totalReceita = contratos
@@ -233,7 +267,7 @@ export default function Contratos() {
         <div className="flex gap-2">
           <Button 
             variant="outline"
-            onClick={() => setIsTipoManagerModalOpen(true)}
+            onClick={() => setIsTipoManagerModal(true)}
             className="flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
@@ -371,7 +405,13 @@ export default function Contratos() {
       {/* Contracts List */}
       <div className="grid gap-4">
         {filteredContratos.map((contrato) => (
-          <Card key={contrato.id} className="shadow-card hover:shadow-card-hover transition-all">
+          <Card 
+            key={contrato.id} 
+            className={cn(
+              "shadow-card hover:shadow-card-hover transition-all",
+              getCardShadingClass(contrato.mesesRestantes)
+            )}
+          >
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex-1 space-y-4">
@@ -425,7 +465,9 @@ export default function Contratos() {
 
                     <div className="bg-accent/50 p-3 rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
-                      <span className="font-medium">{contrato.parcelas}x {contrato.valorParcela}</span>
+                      <span className="font-medium">
+                        {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
+                      </span>
                     </div>
 
                     <div className="bg-accent/50 p-3 rounded-lg">
@@ -557,7 +599,7 @@ export default function Contratos() {
       <TipoContratoManagerModal
         isOpen={isTipoManagerModalOpen}
         onClose={() => {
-          setIsTipoManagerModalOpen(false);
+          setIsTipoManagerModal(false);
         }}
         onTiposChange={handleTiposChange}
       />

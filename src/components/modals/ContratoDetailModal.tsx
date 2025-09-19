@@ -61,6 +61,9 @@ interface Contrato {
   // Campos para PDF (tornados opcionais)
   pdfUrl?: string;
   pdfName?: string;
+  // Novos campos para parcelas pagas/restantes
+  parcelasPagas?: number;
+  parcelasRestantes?: number;
 }
 
 interface ContratoDetailModalProps {
@@ -205,7 +208,9 @@ export function ContratoDetailModal({ isOpen, onClose, contrato, todosContratos,
                     <Hash className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Parcelas</p>
-                      <span className="font-medium">{contrato.parcelas}x {contrato.valorParcela}</span>
+                      <span className="font-medium">
+                        {contrato.parcelasPagas !== undefined ? contrato.parcelasPagas : 'N/A'} pagas de {contrato.parcelas} ({contrato.parcelasRestantes !== undefined ? contrato.parcelasRestantes : 'N/A'} restantes)
+                      </span>
                     </div>
                   </div>
                 </CardContent>

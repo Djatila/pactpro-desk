@@ -62,6 +62,10 @@ interface Contrato {
   // Campos para PDF
   pdfUrl?: string;
   pdfName?: string;
+  // Novos campos para parcelas pagas/restantes
+  parcelasPagas: number;
+  parcelasRestantes: number;
+  mesesRestantes: number; // Adicionado para facilitar a ordenação
 }
 
 interface DataContextType {
@@ -77,7 +81,7 @@ interface DataContextType {
   addBanco: (banco: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>) => Promise<boolean>;
   updateBanco: (id: string, banco: Partial<Banco>) => Promise<boolean>;
   deleteBanco: (id: string) => Promise<boolean>;
-  addContrato: (contrato: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>) => Promise<boolean>;
+  addContrato: (contrato: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status' | 'parcelasPagas' | 'parcelasRestantes' | 'mesesRestantes'>) => Promise<boolean>;
   updateContrato: (id: string, contrato: Partial<Contrato>) => Promise<boolean>;
   deleteContrato: (id: string) => Promise<boolean>;
   updateMetaAnual: (meta: number) => Promise<boolean>;
@@ -266,6 +270,26 @@ export function DataProvider({ children }: DataProviderProps) {
         const valorParcela = contrato.valor_total / contrato.parcelas;
         const receitaAgente = contrato.valor_total * (contrato.taxa / 100);
 
+        // Calcular parcelas pagas e restantes
+        let parcelasPagas = 0;
+        let mesesRestantes = contrato.parcelas; // Inicialmente, todas as parcelas restantes
+
+        try {
+          const [day, month, year] = contrato.data_emprestimo.split('/');
+          const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          const hoje = new Date();
+
+          // Calcular meses passados desde o início do contrato
+          const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
+          const diffMonths = hoje.getMonth() - dataInicio.getMonth();
+          const totalMonthsPassed = diffYears * 12 + diffMonths;
+
+          parcelasPagas = Math.max(0, Math.min(contrato.parcelas, totalMonthsPassed));
+          mesesRestantes = Math.max(0, contrato.parcelas - parcelasPagas);
+        } catch (dateError) {
+          console.warn('Erro ao calcular parcelas pagas para contrato:', contrato.id, dateError);
+        }
+        
         return {
           id: contrato.id,
           clienteId: contrato.cliente_id,
@@ -296,7 +320,11 @@ export function DataProvider({ children }: DataProviderProps) {
           valorPrestacao: contrato.valor_prestacao,
           // Campos para PDF
           pdfUrl: contrato.pdf_url,
-          pdfName: contrato.pdf_name
+          pdfName: contrato.pdf_name,
+          // Novos campos calculados
+          parcelasPagas,
+          parcelasRestantes: contrato.parcelas - parcelasPagas,
+          mesesRestantes // Adicionado para facilitar a ordenação
         };
       });
 
@@ -591,7 +619,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   };
 
-  const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status'>): Promise<boolean> => {
+  const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status' | 'parcelasPagas' | 'parcelasRestantes' | 'mesesRestantes'>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -648,26 +676,26 @@ export function DataProvider({ children }: DataProviderProps) {
 
     try {
       // Remover campos de PDF dos dados do contrato antes de enviar para o banco
-      const { pdfUrl, pdfName, ...contratoDataWithoutPdf } = contratoData as any;
+      const { pdfUrl, pdfName, parcelasPagas, parcelasRestantes, mesesRestantes, ...contratoDataWithoutCalculated } = contratoData as any;
       
       const updateData: any = {};
-      if (contratoDataWithoutPdf.clienteId) updateData.cliente_id = contratoDataWithoutPdf.clienteId;
-      if (contratoDataWithoutPdf.bancoId) updateData.banco_id = contratoDataWithoutPdf.bancoId;
-      if (contratoDataWithoutPdf.tipoContrato !== undefined) updateData.tipo_contrato = contratoDataWithoutPdf.tipoContrato;
-      if (contratoDataWithoutPdf.dataEmprestimo) updateData.data_emprestimo = contratoDataWithoutPdf.dataEmprestimo;
-      if (contratoDataWithoutPdf.valorTotal !== undefined) updateData.valor_total = contratoDataWithoutPdf.valorTotal;
-      if (contratoDataWithoutPdf.parcelas !== undefined) updateData.parcelas = contratoDataWithoutPdf.parcelas;
-      if (contratoDataWithoutPdf.taxa !== undefined) updateData.taxa = contratoDataWithoutPdf.taxa;
-      if (contratoDataWithoutPdf.status) updateData.status = contratoDataWithoutPdf.status;
-      if (contratoDataWithoutPdf.observacoes !== undefined) updateData.observacoes = contratoDataWithoutPdf.observacoes;
+      if (contratoDataWithoutCalculated.clienteId) updateData.cliente_id = contratoDataWithoutCalculated.clienteId;
+      if (contratoDataWithoutCalculated.bancoId) updateData.banco_id = contratoDataWithoutCalculated.bancoId;
+      if (contratoDataWithoutCalculated.tipoContrato !== undefined) updateData.tipo_contrato = contratoDataWithoutCalculated.tipoContrato;
+      if (contratoDataWithoutCalculated.dataEmprestimo) updateData.data_emprestimo = contratoDataWithoutCalculated.dataEmprestimo;
+      if (contratoDataWithoutCalculated.valorTotal !== undefined) updateData.valor_total = contratoDataWithoutCalculated.valorTotal;
+      if (contratoDataWithoutCalculated.parcelas !== undefined) updateData.parcelas = contratoDataWithoutCalculated.parcelas;
+      if (contratoDataWithoutCalculated.taxa !== undefined) updateData.taxa = contratoDataWithoutCalculated.taxa;
+      if (contratoDataWithoutCalculated.status) updateData.status = contratoDataWithoutCalculated.status;
+      if (contratoDataWithoutCalculated.observacoes !== undefined) updateData.observacoes = contratoDataWithoutCalculated.observacoes;
       // Novos campos
-      if (contratoDataWithoutPdf.primeiroVencimento !== undefined) updateData.primeiro_vencimento = contratoDataWithoutPdf.primeiroVencimento;
-      if (contratoDataWithoutPdf.valorOperacao !== undefined) updateData.valor_operacao = contratoDataWithoutPdf.valorOperacao;
-      if (contratoDataWithoutPdf.valorSolicitado !== undefined) updateData.valor_solicitado = contratoDataWithoutPdf.valorSolicitado;
-      if (contratoDataWithoutPdf.valorPrestacao !== undefined) updateData.valor_prestacao = contratoDataWithoutPdf.valorPrestacao;
+      if (contratoDataWithoutCalculated.primeiroVencimento !== undefined) updateData.primeiro_vencimento = contratoDataWithoutCalculated.primeiroVencimento;
+      if (contratoDataWithoutCalculated.valorOperacao !== undefined) updateData.valor_operacao = contratoDataWithoutCalculated.valorOperacao;
+      if (contratoDataWithoutCalculated.valorSolicitado !== undefined) updateData.valor_solicitado = contratoDataWithoutCalculated.valorSolicitado;
+      if (contratoDataWithoutCalculated.valorPrestacao !== undefined) updateData.valor_prestacao = contratoDataWithoutCalculated.valorPrestacao;
       // Campos para PDF (não atualizamos esses campos aqui, eles são atualizados separadamente)
-      // if (contratoDataWithoutPdf.pdfUrl !== undefined) updateData.pdf_url = contratoDataWithoutPdf.pdfUrl;
-      // if (contratoDataWithoutPdf.pdfName !== undefined) updateData.pdf_name = contratoDataWithoutPdf.pdfName;
+      // if (contratoDataWithoutCalculated.pdfUrl !== undefined) updateData.pdf_url = contratoDataWithoutCalculated.pdfUrl;
+      // if (contratoDataWithoutCalculated.pdfName !== undefined) updateData.pdf_name = contratoDataWithoutCalculated.pdfName;
 
       const { error } = await supabase
         .from('contratos')
@@ -898,6 +926,28 @@ export function DataProvider({ children }: DataProviderProps) {
       if (error) throw error;
 
       if (data) {
+        const valorParcela = data.valor_total / data.parcelas;
+        const receitaAgente = data.valor_total * (data.taxa / 100);
+
+        // Recalcular parcelas pagas e restantes para o contrato atualizado
+        let parcelasPagas = 0;
+        let mesesRestantes = data.parcelas;
+
+        try {
+          const [day, month, year] = data.data_emprestimo.split('/');
+          const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          const hoje = new Date();
+
+          const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
+          const diffMonths = hoje.getMonth() - dataInicio.getMonth();
+          const totalMonthsPassed = diffYears * 12 + diffMonths;
+
+          parcelasPagas = Math.max(0, Math.min(data.parcelas, totalMonthsPassed));
+          mesesRestantes = Math.max(0, data.parcelas - parcelasPagas);
+        } catch (dateError) {
+          console.warn('Erro ao recalcular parcelas pagas para contrato:', data.id, dateError);
+        }
+
         const contratoFormatted: Contrato = {
           id: data.id,
           clienteId: data.cliente_id,
@@ -908,13 +958,13 @@ export function DataProvider({ children }: DataProviderProps) {
           dataEmprestimo: data.data_emprestimo,
           valorTotal: data.valor_total,
           parcelas: data.parcelas,
-          valorParcela: (data.valor_total / data.parcelas).toLocaleString('pt-BR', {
+          valorParcela: valorParcela.toLocaleString('pt-BR', {
             style: 'currency',
             currency: 'BRL',
             minimumFractionDigits: 2
           }),
           taxa: data.taxa,
-          receitaAgente: (data.valor_total * (data.taxa / 100)).toLocaleString('pt-BR', {
+          receitaAgente: receitaAgente.toLocaleString('pt-BR', {
             style: 'currency',
             currency: 'BRL',
             minimumFractionDigits: 2
@@ -928,7 +978,11 @@ export function DataProvider({ children }: DataProviderProps) {
           valorPrestacao: data.valor_prestacao,
           // Campos para PDF
           pdfUrl: data.pdf_url,
-          pdfName: data.pdf_name
+          pdfName: data.pdf_name,
+          // Novos campos calculados
+          parcelasPagas,
+          parcelasRestantes: data.parcelas - parcelasPagas,
+          mesesRestantes
         };
 
         // Atualizar o contrato específico no estado
