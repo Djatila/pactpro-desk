@@ -112,11 +112,20 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+				// Keyframes para o efeito de fade-blink
+				'fade-blink': {
+					'0%, 100%': { opacity: '0.4' }, /* Opacidade inicial e final mais alta */
+					'50%': { opacity: '0.9' },    /* Opacidade máxima um pouco mais baixa para um fade leve */
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				// Animações personalizadas para o efeito de piscar
+				'blink-slow': 'fade-blink 2s infinite ease-in-out',
+				'blink-medium': 'fade-blink 1s infinite ease-in-out',
+				'blink-fast': 'fade-blink 0.5s infinite ease-in-out',
 			}
 		}
 	},
