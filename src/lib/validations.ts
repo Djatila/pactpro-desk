@@ -149,19 +149,7 @@ export const contratoSchema = z.object({
     .max(15, 'Taxa deve ser menor que 15%'),
   
   dataEmprestimo: z.string()
-    .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Data deve estar no formato DD/MM/AAAA')
-    .refine((date) => {
-      const [day, month, year] = date.split('/').map(Number);
-      const inputDate = new Date(year, month - 1, day);
-      const today = new Date();
-      
-      // Normalizar as datas para comparar apenas dia/mês/ano (sem horário)
-      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const inputNormalized = new Date(year, month - 1, day);
-      const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-      
-      return inputNormalized >= todayNormalized && inputNormalized <= maxDate;
-    }, 'Data deve ser hoje ou no futuro (máximo 1 ano)'),
+    .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Data deve estar no formato DD/MM/AAAA'),
   
   observacoes: z.string().optional(),
   // Novos campos
