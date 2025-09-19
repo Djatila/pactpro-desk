@@ -550,33 +550,34 @@ export default function Contratos() {
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => handleDeleteContrato(contrato)}
                         title="Excluir contrato"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDownloadContrato(contrato)}
+                      disabled={!contrato.pdfUrl}
+                      className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Download className="h-4 w-4 mr-1" />
+                      PDF
                     </Button>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDownloadContrato(contrato)}
-                    disabled={!contrato.pdfUrl}
-                    className={contrato.pdfUrl ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    PDF
-                  </Button>
+                
+                  {/* PDF Status Indicator */}
+                  {contrato.pdfUrl && (
+                    <div className="flex items-center gap-2 text-sm text-success mt-2">
+                      <File className="h-4 w-4" />
+                      <span>Documento PDF anexado</span>
+                    </div>
+                  )}
                 </div>
-              
-                {/* PDF Status Indicator */}
-                {contrato.pdfUrl && (
-                  <div className="flex items-center gap-2 text-sm text-success mt-2">
-                    <File className="h-4 w-4" />
-                    <span>Documento PDF anexado</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {filteredContratos.length === 0 && (
