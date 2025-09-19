@@ -58,11 +58,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Removido log para evitar loop infinito
         // console.log('🔍 Iniciando verificação de sessão...');
         
-        // Timeout aumentado para PCs com conectividade mais lenta (15 segundos)
+        // Timeout aumentado para PCs com conectividade mais lenta (25 segundos)
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
+            console.error('❌ Timeout atingido na verificação de sessão do Supabase.');
             reject(new Error('Timeout na verificação de sessão'));
-          }, 15000); // Aumentado de 10s para 15s para maior tolerância
+          }, 25000); // Aumentado de 15s para 25s para maior tolerância
         });
 
         // Verificação inicial rápida - tentar localStorage primeiro
