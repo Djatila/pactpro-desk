@@ -153,7 +153,7 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
   return (
     <div className="space-y-3">
       <h3 className="font-medium text-lg flex items-center gap-2">
-        <File className="h-4 w-4 text-primary" />
+        <File className="h-5 w-5 text-primary" />
         Documento do Contrato (PDF)
       </h3>
       
