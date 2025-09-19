@@ -264,7 +264,7 @@ export default function Contratos() {
       animationDuration = '1.5s';
     } else if (mesesRestantes === 6) {
       colorClass = 'bg-green-500'; // Manter verde para 6 meses
-      animationDuration = '3s'; // Mais lento para 6 meses
+      animationDuration = '1.5s'; // Mais lento para 6 meses, mas perceptível
     }
 
     return {
