@@ -562,7 +562,7 @@ export default function Contratos() {
                   {contrato.pdfUrl && (
                     <div className="flex items-center gap-2 text-sm text-success mt-2">
                       <File className="h-4 w-4" />
-                      <span>Documento PDF anexado</span>
+                      <span>PDF anexado</span>
                     </div>
                   )}
                 </div>
