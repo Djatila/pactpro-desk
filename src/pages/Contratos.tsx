@@ -248,12 +248,10 @@ export default function Contratos() {
   const getBlinkIndicatorClass = (mesesRestantes: number) => {
     if (mesesRestantes <= 0 || mesesRestantes > 6) return null; // Não exibir se já venceu ou muito longe
 
-    let colorClass = 'bg-green-500'; // Padrão verde
-    let animationDuration = '2s'; // Padrão lento
+    let animationDuration = '2s'; // Default slower blink
 
     if (mesesRestantes === 1) {
-      colorClass = 'bg-red-500';
-      animationDuration = '0.5s'; // Mais rápido
+      animationDuration = '0.5s'; // Mais rápido para mais urgente
     } else if (mesesRestantes === 2) {
       animationDuration = '0.8s';
     } else if (mesesRestantes === 3) {
@@ -263,12 +261,11 @@ export default function Contratos() {
     } else if (mesesRestantes === 5) {
       animationDuration = '1.5s';
     } else if (mesesRestantes === 6) {
-      colorClass = 'bg-yellow-500'; // Amarelo para 6 meses
-      animationDuration = '1s'; // Mais rápido para 6 meses
+      animationDuration = '1.8s'; // Ligeiramente mais lento para 6 meses
     }
 
     return {
-      className: `w-2 h-2 rounded-full ${colorClass} animate-fade-blink`,
+      className: `w-2 h-2 rounded-full bg-green-500 border border-green-700 animate-fade-blink`, // Sempre verde, com borda
       style: { animationDuration }
     };
   };
