@@ -206,7 +206,7 @@ export function ContratoPdfManager({ contratoId, pdfUrl, pdfName, onPdfUpdate }:
           <CardContent className="p-6">
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
               <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="font-medium mb-1">Arraste e solte o PDF aqui</p>
+              <p className="font-medium mb-1">Clique no botão abaixo👇</p>
               <p className="text-sm text-muted-foreground mb-3">ou</p>
               <Button
                 variant="outline"
