@@ -464,7 +464,7 @@ export default function Contratos() {
                     </div>
 
                     <div className="bg-accent/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Parcelas</p>
+                      <p className="text-xs text-muted-foreground mb-1">Parcelas</p>
                       <span className="font-medium">
                         {contrato.parcelasPagas} pagas de {contrato.parcelas} ({contrato.parcelasRestantes} restantes)
                       </span>
