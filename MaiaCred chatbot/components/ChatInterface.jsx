@@ -111,7 +111,7 @@ const MessageBubble = ({ message, isStreaming }) => {
 export default function ChatInterface() {
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([
-    { role: Role.MODEL, text: "Olá! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
+    { role: Role.MODEL, text: "Olá Binho! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
