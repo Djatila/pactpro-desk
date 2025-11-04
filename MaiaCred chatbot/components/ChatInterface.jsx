@@ -238,7 +238,8 @@ export default function ChatInterface() {
         });
 
         // 3. Enviar o resultado da ferramenta de volta para o Gemini
-        response = await chat.sendMessage({
+        // Usamos o chat.sendMessageStream para garantir que o modelo comece a gerar texto imediatamente
+        const stream = await chat.sendMessageStream({
           contents: [{
             role: 'tool',
             parts: [{
@@ -249,42 +250,34 @@ export default function ChatInterface() {
             }],
           }],
         });
-      }
-      
-      // 4. Processar a resposta final (que deve conter o texto)
-      let text = '';
-      
-      // Se a resposta final do loop for vazia, forçamos uma nova rodada com um prompt explícito
-      if (!response.text) {
-          console.warn("Modelo não gerou texto após a tool call. Forçando nova geração de texto...");
-          
-          // Enviar um prompt explícito para forçar a geração de texto
-          const newResponse = await chat.sendMessage({
-              contents: [{
-                  role: 'user', 
-                  parts: [{ text: "Please provide a final, concluding response based on all previous turns including the recent tool output." }],
-              }],
-          });
-          
-          // Tentar extrair o texto da nova resposta
-          if (newResponse.text) {
-              text = newResponse.text;
-          } else {
-              // Fallback se mesmo o prompt forçado falhar
-              text = "Consulta concluída, mas o modelo não gerou uma resposta em texto. Tente reformular a pergunta.";
+        
+        let text = '';
+        let finalResponse = { text: '', functionCalls: [] };
+        
+        for await (const chunk of stream) {
+          if (chunk.text) {
+            text += chunk.text;
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[currentMessageIndex - 1].text = text;
+                return newMessages;
+            });
           }
-      } else {
-        // Se a resposta original já tinha texto, usamos ele
-        text = response.text;
+          // Capturar a resposta final do stream para verificar se há mais tool calls
+          finalResponse = chunk;
+        }
+        
+        // Se houver mais tool calls, o loop continua
+        response = finalResponse;
+        
+        // Se o loop terminar, o texto final já foi gerado pelo stream
+        if (!response.functionCalls || response.functionCalls.length === 0) {
+            break;
+        }
       }
       
-      // 5. Atualizar a mensagem final com o texto completo
-      setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[currentMessageIndex - 1].text = text;
-          return newMessages;
-      });
-
+      // Se o loop terminou, o texto final já foi gerado pelo stream.
+      // Não precisamos de mais lógica aqui.
 
     } catch (e) {
       console.error(e);
