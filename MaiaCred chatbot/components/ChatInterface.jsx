@@ -260,7 +260,7 @@ export default function ChatInterface() {
           // Acumular o texto
           if (chunk.text) {
             text += chunk.text;
-            // Usar a função de atualização para garantir o estado mais recente
+            // Atualizar o estado com o texto acumulado
             setMessages(prev => {
                 const newMessages = [...prev];
                 newMessages[currentMessageIndex - 1].text = text;
@@ -280,15 +280,8 @@ export default function ChatInterface() {
         }
       }
       
-      // Se o loop terminou, o texto final já foi gerado pelo stream.
-      // Garantir que o texto final seja definido, caso o último chunk não tenha sido capturado corretamente
-      if (response.text) {
-          setMessages(prev => {
-              const newMessages = [...prev];
-              newMessages[currentMessageIndex - 1].text = response.text;
-              return newMessages;
-          });
-      }
+      // Não é necessário garantir o texto final aqui, pois o último setMessages dentro do loop for await já deve ter o texto completo.
+      // Apenas garantir que o isLoading seja false no finally.
 
     } catch (e) {
       console.error(e);
