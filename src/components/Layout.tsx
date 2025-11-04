@@ -4,6 +4,7 @@ import { AccountSettingsModal } from "@/components/modals/AccountSettingsModal";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ConnectivityStatus } from "@/components/ConnectivityStatus";
 import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
+import { ChatbotWidget } from "@/components/ChatbotWidget"; // Importar o novo componente
 import { User, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -108,6 +109,9 @@ export function Layout({ children }: LayoutProps) {
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
       />
+      
+      {/* Chatbot Flutuante */}
+      <ChatbotWidget />
     </SidebarProvider>
   );
 }
