@@ -112,8 +112,16 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY) as string;
+    
+    if (!apiKey || apiKey === '""') {
+        setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
+        setIsLoading(false);
+        return;
+    }
+    
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const ai = new GoogleGenAI({ apiKey });
       const chatSession = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
