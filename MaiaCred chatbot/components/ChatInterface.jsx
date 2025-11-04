@@ -218,7 +218,7 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
-            newMessages[currentMessageIndex - 1].text = 'Aguarde, consultando o banco de dados...';
+            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto para o streaming
             return newMessages;
         });
 
@@ -234,7 +234,7 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolResponse = toolResult;
-            newMessages[currentMessageIndex - 1].text = 'Analisando dados...';
+            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto novamente antes do streaming
             return newMessages;
         });
 
