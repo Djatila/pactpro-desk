@@ -21,13 +21,13 @@ const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/
 // --- Definição da Ferramenta Gemini (Tool Calling) ---
 const databaseQueryTool = {
   name: 'queryDatabase',
-  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?').`,
+  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?', 'qual o meu nome?').`,
   parameters: {
     type: 'OBJECT',
     properties: {
       tableName: {
         type: 'STRING',
-        description: 'O nome da tabela a ser consultada (clientes, contratos, bancos, configuracoes, tipos_contrato).',
+        description: 'O nome da tabela a ser consultada (clientes, contratos, bancos, configuracoes, tipos_contrato, profiles).',
       },
       filters: {
         type: 'OBJECT',
@@ -213,8 +213,10 @@ export default function ChatInterface() {
           throw new Error(`Erro na Edge Function (${response.status}): ${errorText}`);
         }
       }
-
-      return response.json();
+      
+      const result = await response.json();
+      console.log('DEBUG EDGE CALL: Resposta JSON recebida:', result); // NOVO LOG
+      return result;
     } catch (networkError) {
       clearTimeout(timeoutId);
       if (networkError.name === 'AbortError') {
