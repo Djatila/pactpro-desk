@@ -218,7 +218,7 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
-            // Não definimos o texto aqui, confiamos no streaming para preencher
+            newMessages[currentMessageIndex - 1].text = 'Aguarde, consultando o banco de dados...';
             return newMessages;
         });
 
@@ -234,7 +234,6 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolResponse = toolResult;
-            // Adicionar um texto temporário para indicar que a resposta está sendo gerada
             newMessages[currentMessageIndex - 1].text = 'Analisando dados...';
             return newMessages;
         });
@@ -259,6 +258,7 @@ export default function ChatInterface() {
           // Acumular o texto
           if (chunk.text) {
             text += chunk.text;
+            // Usar a função de atualização para garantir o estado mais recente
             setMessages(prev => {
                 const newMessages = [...prev];
                 newMessages[currentMessageIndex - 1].text = text;
@@ -279,7 +279,14 @@ export default function ChatInterface() {
       }
       
       // Se o loop terminou, o texto final já foi gerado pelo stream.
-      // Não precisamos de mais lógica aqui.
+      // Garantir que o texto final seja definido, caso o último chunk não tenha sido capturado corretamente
+      if (response.text) {
+          setMessages(prev => {
+              const newMessages = [...prev];
+              newMessages[currentMessageIndex - 1].text = response.text;
+              return newMessages;
+          });
+      }
 
     } catch (e) {
       console.error(e);
