@@ -74,10 +74,6 @@ const MessageBubble = ({ message, isStreaming }) => {
     ? 'bg-blue-600 self-end rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
     : 'bg-gray-700 self-start rounded-tr-2xl rounded-tl-2xl rounded-br-2xl';
 
-  // Condição robusta para mostrar o loading:
-  // 1. É uma mensagem do modelo (bot)
-  // 2. O texto está vazio OU o texto é 'Analisando dados...' (se tivermos voltado a usar o placeholder)
-  // 3. O chat está em streaming (isStreaming é true)
   const showLoading = message.role === Role.MODEL && isStreaming && message.text.length === 0;
 
   return (
@@ -296,7 +292,22 @@ export default function ChatInterface() {
 
     } catch (e) {
       console.error(e);
-      const errorMessage = e instanceof Error ? e.message : 'Ocorreu um erro desconhecido.';
+      
+      let errorMessage = 'Ocorreu um erro desconhecido.';
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      }
+      
+      // Tentar extrair a mensagem de erro da API se for um objeto JSON
+      try {
+        const apiErrorMatch = errorMessage.match(/\{"error":\{"code":\d+,"message":"([^"]+)","status":"[^"]+"\}\}/);
+        if (apiErrorMatch && apiErrorMatch[1]) {
+          errorMessage = `Erro da API: ${apiErrorMatch[1]}`;
+        }
+      } catch (parseError) {
+        // Ignorar erro de parse se a mensagem não for JSON
+      }
+      
       setError(`Erro: ${errorMessage}`);
       setMessages(prev => prev.slice(0, -1)); // Remove the placeholder
       setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro. ${errorMessage}` }]);
