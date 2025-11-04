@@ -44,7 +44,7 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
 
 // Função principal para consultar o banco de dados
 async function queryDatabase(userId: string, tableName: string, filters: Record<string, any> = {}) {
-  console.log(`Consultando tabela: ${tableName} para user: ${userId}`);
+  console.log(`DEBUG: Consultando tabela: ${tableName} para user: ${userId}`);
   
   let selectColumns = '*';
   
@@ -74,10 +74,11 @@ async function queryDatabase(userId: string, tableName: string, filters: Record<
   const { data, error } = await query;
 
   if (error) {
-    console.error(`Erro na consulta SQL para ${tableName}:`, error);
+    console.error(`DEBUG: Erro na consulta SQL para ${tableName}:`, error);
     return { error: error.message };
   }
   
+  console.log(`DEBUG: Consulta bem-sucedida para ${tableName}. Resultados: ${data?.length}`);
   return { data };
 }
 

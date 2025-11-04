@@ -63,7 +63,7 @@ export default function Login() {
               <CreditCard className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-primary-dark">MaiaCred</h1>
+          <h1 className="text-3xl font-bold text-primary-dark">MaiaCred2</h1>
           <p className="text-muted-foreground">Sistema de Gestão de Contratos de Crédito</p>
         </div>
 
