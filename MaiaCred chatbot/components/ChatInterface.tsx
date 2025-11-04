@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type } from '@google/genai';
 import { Role, ChatMessage, DatabaseQueryTool } from '../types';
-import { supabaseClient } from '@/integrations/supabase/client'; // Importar o cliente diretamente
+import { supabaseClient } from '../../src/integrations/supabase/client'; // Importar o cliente diretamente com caminho relativo
 
 // --- Configuração da Edge Function ---
 // Substitua pelo seu Project ID do Supabase
