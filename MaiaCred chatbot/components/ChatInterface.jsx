@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
-import { GoogleGenAI, Chat, FunctionDeclaration, Type } from '@google/genai';
+import { GoogleGenAI, Chat } from '@google/genai';
 import { Role, ChatMessage, DatabaseQueryTool } from '../types.js';
 // Removido: import { supabaseClient } from '../../src/integrations/supabase/client'; 
 
