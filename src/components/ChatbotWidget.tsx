@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -7,9 +7,12 @@ export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  
+  // 1. Obter a chave da API do Gemini do ambiente injetado pelo Vite
+  const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  // O chatbot está na pasta 'MaiaCred chatbot', então o caminho é /MaiaCred chatbot/index.html
-  const chatbotUrl = '/MaiaCred chatbot/index.html';
+  // 2. Construir a URL do chatbot com a chave como query parameter
+  const chatbotUrl = `/MaiaCred chatbot/index.html?apiKey=${geminiApiKey}`;
 
   const toggleChat = () => {
     setIsOpen(!isOpen);

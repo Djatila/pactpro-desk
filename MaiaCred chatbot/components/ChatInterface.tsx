@@ -11,7 +11,7 @@ const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/
 // --- Definição da Ferramenta Gemini (Tool Calling) ---
 const databaseQueryTool: FunctionDeclaration = {
   name: 'queryDatabase',
-  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor do contrato X?').`,
+  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?').`,
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -112,10 +112,11 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Tenta ler a chave da variável injetada pelo define do Vite
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string;
+    // 1. Ler a chave da API do Gemini do query parameter da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const apiKey = urlParams.get('apiKey');
     
-    if (!apiKey || apiKey === '""' || apiKey.startsWith('AIzaSy')) {
+    if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey.startsWith('AIzaSy')) {
         setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
         return;
