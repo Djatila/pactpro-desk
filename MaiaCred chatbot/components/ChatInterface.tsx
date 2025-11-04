@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type } from '@google/genai';
 import { Role, ChatMessage, DatabaseQueryTool } from '../types';
-import { supabase } from '@/lib/supabase'; // Importar cliente Supabase do app principal
+import { supabaseClient } from '@/integrations/supabase/client'; // Importar o cliente diretamente
 
 // --- Configuração da Edge Function ---
 // Substitua pelo seu Project ID do Supabase
@@ -152,11 +152,12 @@ export default function ChatInterface() {
 
   // Função para chamar a Edge Function do Supabase
   const callSupabaseEdgeFunction = async (toolCall: DatabaseQueryTool) => {
-    const session = await supabase.auth.getSession();
+    // Usar o cliente Supabase importado diretamente
+    const session = await supabaseClient.auth.getSession();
     const token = session.data.session?.access_token;
 
     if (!token) {
-      throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+      throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
 
     const response = await fetch(EDGE_FUNCTION_URL, {
