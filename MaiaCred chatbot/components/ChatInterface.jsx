@@ -236,7 +236,6 @@ export default function ChatInterface() {
         });
 
         // 3. Enviar o resultado da ferramenta de volta para o Gemini
-        // CORREÇÃO: Usar a estrutura 'contents' com role 'tool' e 'functionResponse'
         response = await chat.sendMessage({
           contents: [{
             role: 'tool',
@@ -253,23 +252,20 @@ export default function ChatInterface() {
       // 4. Stream da resposta final
       let text = '';
       
-      // Se a resposta final for um objeto de texto, use-o. Caso contrário, use a resposta completa.
-      // Se response.text for undefined, o stream falhará.
+      // Se a resposta final tiver texto, fazemos o stream.
       if (response.text) {
-        const stream = await chat.sendMessageStream({ message: response.text });
-        for await (const chunk of stream) {
-          text += chunk.text;
-          setMessages(prev => {
-              const newMessages = [...prev];
-              newMessages[currentMessageIndex - 1].text = text;
-              return newMessages;
-          });
-        }
+        // Se a resposta já tem texto, não precisamos chamar sendMessageStream,
+        // pois a resposta já está completa após a tool call.
+        // Apenas atualizamos o texto da última mensagem.
+        text = response.text;
+        setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].text = text;
+            return newMessages;
+        });
       } else {
         // Se não houver texto, mas a resposta for válida (ex: apenas tool calls), 
         // o loop while deve ter terminado e a resposta final deve ser gerada.
-        // Se chegarmos aqui, significa que o modelo não gerou texto após a tool call.
-        // Isso pode ser um problema de prompt ou de configuração.
         console.warn("Modelo não gerou texto após a tool call. Resposta:", response);
         setMessages(prev => {
             const newMessages = [...prev];
