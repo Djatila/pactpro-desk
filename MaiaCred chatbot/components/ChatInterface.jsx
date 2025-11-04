@@ -237,8 +237,7 @@ export default function ChatInterface() {
             return newMessages;
         });
 
-        // 3. Enviar o resultado da ferramenta de volta para o Gemini
-        // Usamos o chat.sendMessageStream para garantir que o modelo comece a gerar texto imediatamente
+        // 3. Enviar o resultado da ferramenta de volta para o Gemini e obter o stream
         const stream = await chat.sendMessageStream({
           contents: [{
             role: 'tool',
@@ -255,6 +254,7 @@ export default function ChatInterface() {
         let finalResponse = { text: '', functionCalls: [] };
         
         for await (const chunk of stream) {
+          // Acumular o texto
           if (chunk.text) {
             text += chunk.text;
             setMessages(prev => {
@@ -267,10 +267,10 @@ export default function ChatInterface() {
           finalResponse = chunk;
         }
         
-        // Se houver mais tool calls, o loop continua
+        // Atualizar a variável de resposta para o próximo ciclo do loop
         response = finalResponse;
         
-        // Se o loop terminar, o texto final já foi gerado pelo stream
+        // Se o loop terminar, o texto final já foi gerado pelo stream.
         if (!response.functionCalls || response.functionCalls.length === 0) {
             break;
         }
