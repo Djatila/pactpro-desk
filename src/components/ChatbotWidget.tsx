@@ -9,7 +9,8 @@ export function ChatbotWidget() {
   const [loadError, setLoadError] = useState(false);
   
   // 1. Obter a chave da API do Gemini do ambiente injetado pelo Vite
-  const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  // Garantir que seja lida como string, usando um fallback para evitar 'undefined' na URL
+  const geminiApiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || 'KEY_NOT_CONFIGURED';
 
   // 2. Construir a URL do chatbot com a chave como query parameter
   const chatbotUrl = `/MaiaCred chatbot/index.html?apiKey=${geminiApiKey}`;
@@ -26,7 +27,14 @@ export function ChatbotWidget() {
     let timeoutId: NodeJS.Timeout;
     
     if (isOpen) {
-      // Se o iframe não carregar em 10 segundos, assumimos um erro de configuração
+      // Se a chave não estiver configurada, mostrar erro imediatamente
+      if (geminiApiKey === 'KEY_NOT_CONFIGURED') {
+        setIsLoading(false);
+        setLoadError(true);
+        return;
+      }
+      
+      // Se o iframe não carregar em 10 segundos, assumimos um erro de carregamento
       timeoutId = setTimeout(() => {
         if (isLoading) {
           console.error('Timeout ao carregar o chatbot. Verifique a chave da API do Gemini.');
@@ -37,12 +45,52 @@ export function ChatbotWidget() {
     }
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, isLoading]);
+  }, [isOpen, isLoading, geminiApiKey]);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
     setLoadError(false);
   };
+
+  // Se a chave não estiver configurada, o botão flutuante deve mostrar o erro
+  if (geminiApiKey === 'KEY_NOT_CONFIGURED' && isOpen) {
+    // Renderizar o erro de configuração diretamente no widget
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <div
+          className={cn(
+            "fixed bottom-20 right-6 w-full max-w-sm h-[80vh] max-h-[600px] bg-gray-900 rounded-xl shadow-2xl transition-all duration-300 ease-in-out border border-gray-700 scale-100 opacity-100 translate-y-0"
+          )}
+        >
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 rounded-xl p-4">
+            <div className="text-center space-y-3">
+              <AlertTriangle className="h-10 w-10 text-red-500 mx-auto" />
+              <p className="text-lg font-semibold text-white">Erro de Configuração</p>
+              <p className="text-sm text-gray-400">
+                O chatbot não conseguiu carregar. Verifique se a variável 
+                <code className="bg-gray-700 p-1 rounded text-yellow-300 mx-1">VITE_GEMINI_API_KEY</code> 
+                está definida corretamente no seu arquivo <code className="bg-gray-700 p-1 rounded text-yellow-300 mx-1">.env.local</code>.
+              </p>
+              <Button 
+                onClick={() => setIsOpen(false)}
+                className="bg-blue-600 hover:bg-blue-500 mt-4"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+        <Button
+          onClick={toggleChat}
+          className="h-14 w-14 rounded-full bg-gradient-primary hover:opacity-90 shadow-lg transition-transform duration-300 hover:scale-105"
+          size="icon"
+          aria-label={isOpen ? "Fechar Chatbot" : "Abrir Chatbot"}
+        >
+          <X className="h-6 w-6 text-white" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
