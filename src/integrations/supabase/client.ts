@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Usar variáveis de ambiente ou valores de fallback do contexto
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://emvnudlonqoyfptrdwtd.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtdm51ZGxvbnFveWZwdHJkd3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NzQ2NDYsImV4cCI6MjA3MjM1MDY0Nn0.E3uZFSDn10r_nxM6BS0WxMGXb73vrOEWoaW7n1BSnj0';
 
 // Cliente mock para quando o Supabase não estiver configurado
 const createMockClient = () => ({
@@ -45,6 +46,7 @@ const createMockClient = () => ({
 // Verificar se as variáveis de ambiente estão configuradas
 let supabaseClient: any;
 
+// Se estiver usando os fallbacks, o cliente será inicializado
 if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
   console.warn('⚠️ Variáveis de ambiente do Supabase não configuradas.');
   console.warn('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env');
