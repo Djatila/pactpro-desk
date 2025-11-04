@@ -11,9 +11,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   // Definir variáveis a serem injetadas
-  const define: Record<string, any> = {
-    'process.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-  };
+  const define: Record<string, any> = {};
+  
+  // Injetar todas as variáveis VITE_ no define
+  for (const key in env) {
+    if (key.startsWith('VITE_')) {
+      define[`import.meta.env.${key}`] = JSON.stringify(env[key]);
+    }
+  }
   
   return {
     server: {
@@ -55,6 +60,6 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
-    define: define, // Injetar a variável de ambiente aqui
+    define: define, // Injetar todas as variáveis de ambiente aqui
   };
 });
