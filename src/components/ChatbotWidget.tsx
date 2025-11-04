@@ -1,18 +1,44 @@
-import { useState } from 'react';
-import { MessageSquare, X, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageSquare, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // O chatbot está na pasta 'MaiaCred chatbot', então o caminho é /MaiaCred chatbot/index.html
   const chatbotUrl = '/MaiaCred chatbot/index.html';
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
-    setIsLoading(true); // Recarregar o loading ao abrir
+    if (!isOpen) {
+      setIsLoading(true); // Recarregar o loading ao abrir
+      setLoadError(false);
+    }
+  };
+  
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (isOpen) {
+      // Se o iframe não carregar em 10 segundos, assumimos um erro de configuração
+      timeoutId = setTimeout(() => {
+        if (isLoading) {
+          console.error('Timeout ao carregar o chatbot. Verifique a chave da API do Gemini.');
+          setIsLoading(false);
+          setLoadError(true);
+        }
+      }, 10000);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, isLoading]);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+    setLoadError(false);
   };
 
   return (
@@ -24,11 +50,41 @@ export function ChatbotWidget() {
           isOpen ? "scale-100 opacity-100 translate-y-0" : "scale-90 opacity-0 translate-y-4 pointer-events-none"
         )}
       >
-        {/* Loading Overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 rounded-xl">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            <p className="ml-3 text-gray-400">Carregando IA...</p>
+        {/* Loading / Error Overlay */}
+        {(isLoading || loadError) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 rounded-xl p-4">
+            {isLoading && (
+              <>
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <p className="ml-3 text-gray-400 mt-3">Carregando IA...</p>
+              </>
+            )}
+            
+            {loadError && (
+              <div className="text-center space-y-3">
+                <AlertTriangle className="h-10 w-10 text-red-500 mx-auto" />
+                <p className="text-lg font-semibold text-white">Erro de Configuração</p>
+                <p className="text-sm text-gray-400">
+                  O chatbot não conseguiu carregar. Verifique se a variável 
+                  <code className="bg-gray-700 p-1 rounded text-yellow-300 mx-1">VITE_GEMINI_API_KEY</code> 
+                  está definida corretamente no seu arquivo <code className="bg-gray-700 p-1 rounded text-yellow-300 mx-1">.env.local</code>.
+                </p>
+                <Button 
+                  onClick={() => {
+                    setLoadError(false);
+                    setIsLoading(true);
+                    // Forçar recarregamento do iframe
+                    const iframe = document.querySelector('iframe[title="MaiaCred Chatbot"]') as HTMLIFrameElement;
+                    if (iframe) {
+                      iframe.src = chatbotUrl;
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 mt-4"
+                >
+                  Tentar Novamente
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -37,8 +93,8 @@ export function ChatbotWidget() {
           src={chatbotUrl}
           title="MaiaCred Chatbot"
           className="w-full h-full rounded-xl"
-          style={{ border: 'none' }}
-          onLoad={() => setIsLoading(false)}
+          style={{ border: 'none', visibility: (isLoading || loadError) ? 'hidden' : 'visible' }}
+          onLoad={handleIframeLoad}
         />
       </div>
 
