@@ -5,8 +5,8 @@ import { Role, ChatMessage, DatabaseQueryTool } from '../types';
 
 // Acessar o cliente Supabase globalmente
 const getSupabaseClient = () => {
-  if (typeof window !== 'undefined' && (window as any).maiacredSupabaseClient) {
-    return (window as any).maiacredSupabaseClient;
+  if (typeof window !== 'undefined' && window.maiacredSupabaseClient) {
+    return window.maiacredSupabaseClient;
   }
   // Fallback para um cliente mock se não estiver disponível (embora o iframe deva carregar depois do app principal)
   console.error("Cliente Supabase não encontrado no escopo global.");
@@ -295,7 +295,7 @@ export default function ChatInterface() {
           <input
             type="text"
             value={input}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Pergunte ao MaiaCred AI..."
             disabled={isLoading}
             className="flex-1 w-full bg-gray-700 text-white placeholder-gray-400 px-4 py-2 rounded-full focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50 transition-shadow"
