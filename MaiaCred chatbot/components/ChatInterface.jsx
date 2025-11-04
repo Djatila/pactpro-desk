@@ -236,17 +236,26 @@ export default function ChatInterface() {
         });
 
         // 3. Enviar o resultado da ferramenta de volta para o Gemini
+        // CORREÇÃO: Usar a estrutura 'contents' com role 'tool' e 'functionResponse'
         response = await chat.sendMessage({
-          toolResponse: [{
-            functionCall: toolCall,
-            response: toolResult,
+          contents: [{
+            role: 'tool',
+            parts: [{
+              functionResponse: {
+                name: toolCall.name,
+                response: toolResult,
+              },
+            }],
           }],
         });
       }
       
       // 4. Stream da resposta final
       let text = '';
-      const stream = await chat.sendMessageStream({ message: response.text });
+      // Se a resposta final for um objeto de texto, use-o. Caso contrário, use a resposta completa.
+      const finalMessage = response.text || JSON.stringify(response);
+      
+      const stream = await chat.sendMessageStream({ message: finalMessage });
       for await (const chunk of stream) {
         text += chunk.text;
         setMessages(prev => {
