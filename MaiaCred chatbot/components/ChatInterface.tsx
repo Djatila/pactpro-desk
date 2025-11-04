@@ -11,7 +11,7 @@ const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/
 // --- Definição da Ferramenta Gemini (Tool Calling) ---
 const databaseQueryTool: FunctionDeclaration = {
   name: 'queryDatabase',
-  description: 'Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor do contrato X?').',
+  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor do contrato X?').`,
   parameters: {
     type: Type.OBJECT,
     properties: {
