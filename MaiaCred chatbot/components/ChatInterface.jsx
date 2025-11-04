@@ -249,23 +249,21 @@ export default function ChatInterface() {
         });
       }
       
-      // 4. Stream da resposta final
+      // 4. Processar a resposta final (que deve conter o texto)
       let text = '';
       
-      // Se a resposta final tiver texto, fazemos o stream.
       if (response.text) {
-        // Se a resposta já tem texto, não precisamos chamar sendMessageStream,
-        // pois a resposta já está completa após a tool call.
-        // Apenas atualizamos o texto da última mensagem.
+        // Se a resposta final tiver texto, fazemos o stream para o usuário
         text = response.text;
+        
+        // Atualizar a mensagem final com o texto completo
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].text = text;
             return newMessages;
         });
       } else {
-        // Se não houver texto, mas a resposta for válida (ex: apenas tool calls), 
-        // o loop while deve ter terminado e a resposta final deve ser gerada.
+        // Se não houver texto, o modelo falhou em gerar a resposta final.
         console.warn("Modelo não gerou texto após a tool call. Resposta:", response);
         setMessages(prev => {
             const newMessages = [...prev];
