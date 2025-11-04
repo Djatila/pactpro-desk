@@ -173,6 +173,9 @@ export default function ChatInterface() {
     if (!token) {
       throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout de 15 segundos
 
     try {
       const response = await fetch(EDGE_FUNCTION_URL, {
@@ -182,7 +185,10 @@ export default function ChatInterface() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(toolCall),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -191,6 +197,10 @@ export default function ChatInterface() {
 
       return response.json();
     } catch (networkError) {
+      clearTimeout(timeoutId);
+      if (networkError.name === 'AbortError') {
+        throw new Error(`Timeout: A Edge Function demorou mais de 15 segundos para responder.`);
+      }
       console.error("Erro de rede/timeout na Edge Function:", networkError);
       throw new Error(`Falha na comunicação com o servidor de dados. Verifique sua conexão ou tente novamente.`);
     }

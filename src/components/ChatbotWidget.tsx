@@ -9,7 +9,7 @@ export function ChatbotWidget() {
   const [loadError, setLoadError] = useState(false);
   
   // 1. Obter a chave da API do Gemini do ambiente injetado pelo Vite
-  // Garantir que seja lida como string, usando um fallback para evitar 'undefined' na URL
+  // Usar o valor injetado pelo vite.config.ts (que inclui o fallback)
   const geminiApiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || 'KEY_NOT_CONFIGURED';
 
   // 2. Construir a URL do chatbot com a chave como query parameter
@@ -18,7 +18,8 @@ export function ChatbotWidget() {
   const toggleChat = () => {
     setIsOpen(!isOpen);
     if (!isOpen) {
-      setIsLoading(true); // Recarregar o loading ao abrir
+      // Ao fechar, resetar o estado de erro e loading para a próxima abertura
+      setIsLoading(true); 
       setLoadError(false);
     }
   };
@@ -48,8 +49,11 @@ export function ChatbotWidget() {
   }, [isOpen, isLoading, geminiApiKey]);
 
   const handleIframeLoad = () => {
-    setIsLoading(false);
-    setLoadError(false);
+    // Atrasar um pouco para garantir que o JS dentro do iframe tenha tempo de inicializar
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadError(false);
+    }, 500); 
   };
 
   // Se a chave não estiver configurada, o botão flutuante deve mostrar o erro
