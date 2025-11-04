@@ -171,9 +171,12 @@ export default function ChatInterface() {
     const token = sessionResult.data.session?.access_token;
 
     if (!token) {
+      console.error('ERRO DE AUTENTICAÇÃO: Token não encontrado na sessão.');
       throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
     
+    console.log('Token de autenticação obtido (primeiros 10 caracteres):', token.substring(0, 10));
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout de 15 segundos
 
@@ -192,6 +195,7 @@ export default function ChatInterface() {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Resposta de erro da Edge Function:', response.status, errorText);
         throw new Error(`Erro na Edge Function: ${response.statusText} - ${errorText}`);
       }
 
