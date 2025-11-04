@@ -112,10 +112,10 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Tenta ler a chave de ambas as variáveis injetadas
+    // Tenta ler a chave da variável injetada pelo define do Vite
     const apiKey = (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY) as string;
     
-    if (!apiKey || apiKey === '""') {
+    if (!apiKey || apiKey === '""' || apiKey.startsWith('AIzaSy')) {
         setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
         return;
