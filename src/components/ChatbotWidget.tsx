@@ -18,22 +18,31 @@ export function ChatbotWidget() {
   const chatbotUrl = `/MaiaCred chatbot/index.html?apiKey=${geminiApiKey}&supabaseToken=${supabaseToken || ''}`;
 
   // Efeito para obter o token de sessão do Supabase
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+  const fetchSupabaseToken = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
       setSupabaseToken(session?.access_token || null);
-    }).catch(e => {
+    } catch (e) {
       console.error("Erro ao obter token Supabase para chatbot:", e);
       setSupabaseToken(null);
-    });
-  }, [isOpen]); // Recarregar token ao abrir o chat
+    }
+  };
 
-  const toggleChat = () => {
-    setIsOpen(!isOpen);
+  useEffect(() => {
+    // Tentar buscar o token na montagem inicial
+    fetchSupabaseToken();
+  }, []);
+
+  const toggleChat = async () => {
     if (!isOpen) {
-      // Ao fechar, resetar o estado de erro e loading para a próxima abertura
+      // Ao abrir, forçar a busca do token mais recente
+      await fetchSupabaseToken();
+      // Resetar o estado de erro e loading para a próxima abertura
       setIsLoading(true); 
       setLoadError(false);
     }
+    setIsOpen(!isOpen);
   };
   
   useEffect(() => {
