@@ -35,18 +35,24 @@ export function ChatbotWidget() {
         return;
       }
       
-      // Se o iframe não carregar em 10 segundos, assumimos um erro de carregamento
+      // Se o iframe não carregar em 15 segundos, assumimos um erro de carregamento
       timeoutId = setTimeout(() => {
         if (isLoading) {
           console.error('Timeout ao carregar o chatbot. Verifique a chave da API do Gemini.');
           setIsLoading(false);
           setLoadError(true);
         }
-      }, 10000);
+      }, 15000); // Aumentado para 15 segundos
+
+      // Adicionar listener para garantir que o iframe seja recarregado se o erro for resolvido
+      const iframe = document.querySelector('iframe[title="MaiaCred Chatbot"]') as HTMLIFrameElement;
+      if (iframe && iframe.src !== chatbotUrl) {
+        iframe.src = chatbotUrl;
+      }
     }
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, isLoading, geminiApiKey]);
+  }, [isOpen, isLoading, geminiApiKey, chatbotUrl]);
 
   const handleIframeLoad = () => {
     // Atrasar um pouco para garantir que o JS dentro do iframe tenha tempo de inicializar

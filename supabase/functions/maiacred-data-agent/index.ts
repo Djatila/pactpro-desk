@@ -25,6 +25,7 @@ const supabaseAdmin = createClient(
 async function getUserIdFromAuth(req: Request): Promise<string | null> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log("DEBUG: Authorization header missing or invalid format.");
     return null;
   }
   const token = authHeader.replace('Bearer ', '');
@@ -33,9 +34,10 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
   const { data, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !data.user) {
-    console.error("Erro ao verificar token:", error?.message);
+    console.error("DEBUG: Erro ao verificar token:", error?.message);
     return null;
   }
+  console.log(`DEBUG: User ID extraído com sucesso: ${data.user.id}`);
   return data.user.id;
 }
 
@@ -81,6 +83,7 @@ serve(async (req) => {
     const userId = await getUserIdFromAuth(req);
     
     if (!userId) {
+      console.error("DEBUG: Requisição não autorizada - userId nulo.");
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing token' }), {
         status: 401,
         headers: corsHeaders,
