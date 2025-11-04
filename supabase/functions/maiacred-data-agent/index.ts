@@ -31,10 +31,11 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
   const token = authHeader.replace('Bearer ', '');
   
   // Usar o cliente admin para verificar o token
+  // Nota: O RLS é ignorado aqui porque estamos usando a chave Service Role
   const { data, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !data.user) {
-    console.error("DEBUG: Erro ao verificar token:", error?.message);
+    console.error("DEBUG: Erro ao verificar token:", error?.message || 'Usuário não encontrado/token inválido');
     return null;
   }
   console.log(`DEBUG: User ID extraído com sucesso: ${data.user.id}`);
@@ -45,13 +46,20 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
 async function queryDatabase(userId: string, tableName: string, filters: Record<string, any> = {}) {
   console.log(`Consultando tabela: ${tableName} para user: ${userId}`);
   
-  // Simplificando a seleção para '*' para evitar erros de sintaxe na lista de colunas
   let selectColumns = '*';
   
   let query = supabaseAdmin.from(tableName).select(selectColumns);
   
   // Aplicar filtro obrigatório de RLS (segurança)
-  query = query.eq('user_id', userId);
+  // Nota: Embora a Edge Function use a Service Role Key, o filtro 'user_id' é crucial para isolar os dados do usuário.
+  
+  // Verificar se a tabela tem a coluna user_id (configuracoes, perfis, etc.)
+  // Todas as tabelas de dados do usuário devem ter 'user_id'
+  if (tableName !== 'profiles') { // 'profiles' usa 'id' como referência ao auth.users(id)
+    query = query.eq('user_id', userId);
+  } else {
+    query = query.eq('id', userId);
+  }
   
   // Aplicar filtros adicionais (se houver)
   for (const key in filters) {
@@ -100,7 +108,7 @@ serve(async (req) => {
     }
     
     // Lista de tabelas permitidas para consulta pelo chatbot
-    const allowedTables = ['clientes', 'bancos', 'contratos', 'configuracoes', 'tipos_contrato'];
+    const allowedTables = ['clientes', 'bancos', 'contratos', 'configuracoes', 'tipos_contrato', 'profiles'];
     if (!allowedTables.includes(tableName)) {
         return new Response(JSON.stringify({ error: 'Access denied to this table' }), {
             status: 403,
