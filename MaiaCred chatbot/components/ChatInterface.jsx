@@ -196,7 +196,17 @@ export default function ChatInterface() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Resposta de erro da Edge Function:', response.status, errorText);
-        throw new Error(`Erro na Edge Function: ${response.statusText} - ${errorText}`);
+        
+        // Tentar parsear o erro como JSON se o status for 4xx ou 5xx
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error) {
+            throw new Error(`Erro do Servidor (${response.status}): ${errorJson.error}`);
+          }
+        } catch (e) {
+          // Se não for JSON, retornar o status e o texto
+          throw new Error(`Erro na Edge Function (${response.status}): ${errorText}`);
+        }
       }
 
       return response.json();
