@@ -125,7 +125,8 @@ export default function ChatInterface() {
     const urlParams = new URLSearchParams(window.location.search);
     const apiKey = urlParams.get('apiKey');
     
-    if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey.startsWith('AIzaSy')) {
+    // Apenas verificar se a chave está ausente ou é o valor de fallback 'KEY_NOT_CONFIGURED'
+    if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey === 'KEY_NOT_CONFIGURED') {
         setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
         return;

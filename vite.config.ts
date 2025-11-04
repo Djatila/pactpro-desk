@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => {
     }
   }
   
+  // Adicionar a chave Gemini como fallback se não estiver definida (para garantir que o chatbot carregue no ambiente Lovable)
+  if (!define['import.meta.env.VITE_GEMINI_API_KEY']) {
+    // Usando a chave que você forneceu como fallback para o ambiente de desenvolvimento/preview
+    define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify('AIzaSyDip_VjC1J3BZE3qgiOIanHEW6DNV1FdI4');
+  }
+  
   return {
     server: {
       host: "::",
