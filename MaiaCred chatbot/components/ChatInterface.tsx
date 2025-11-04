@@ -1,32 +1,7 @@
+
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
-import { GoogleGenAI, Chat, FunctionDeclaration, Type } from '@google/genai';
-import { Role, ChatMessage, DatabaseQueryTool } from '../types';
-import { supabaseClient } from '../../src/integrations/supabase/client'; // Importar o cliente diretamente com caminho relativo
-
-// --- Configuração da Edge Function ---
-// Substitua pelo seu Project ID do Supabase
-const SUPABASE_PROJECT_ID = 'emvnudlonqoyfptrdwtd'; 
-const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/maiacred-data-agent`;
-
-// --- Definição da Ferramenta Gemini (Tool Calling) ---
-const databaseQueryTool: FunctionDeclaration = {
-  name: 'queryDatabase',
-  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?').`,
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      tableName: {
-        type: Type.STRING,
-        description: 'O nome da tabela a ser consultada (clientes, contratos, bancos, configuracoes, tipos_contrato).',
-      },
-      filters: {
-        type: Type.OBJECT,
-        description: 'Filtros opcionais para a consulta (ex: { status: "ativo" }).',
-      },
-    },
-    required: ['tableName'],
-  },
-};
+import { GoogleGenAI, Chat } from '@google/genai';
+import { Role, ChatMessage } from '../types';
 
 // --- Helper Components (Defined outside the main component to prevent re-creation on re-renders) ---
 
@@ -72,28 +47,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
         {message.text.length === 0 && isStreaming && <LoadingIndicator />}
         <p className="whitespace-pre-wrap">{message.text}</p>
         {isStreaming && message.role === Role.MODEL && <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />}
-        
-        {/* Exibir chamada de ferramenta */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 p-2 bg-gray-600 rounded-lg text-xs text-yellow-300">
-            <p className="font-semibold">⚙️ Chamando Ferramenta:</p>
-            {message.toolCalls.map((call, i) => (
-              <pre key={i} className="mt-1 whitespace-pre-wrap break-words">
-                {JSON.stringify(call.functionCall, null, 2)}
-              </pre>
-            ))}
-          </div>
-        )}
-        
-        {/* Exibir resposta da ferramenta */}
-        {message.toolResponse && (
-          <div className="mt-2 p-2 bg-gray-600 rounded-lg text-xs text-green-300">
-            <p className="font-semibold">✅ Dados Recebidos:</p>
-            <pre className="mt-1 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
-              {JSON.stringify(message.toolResponse, null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -104,7 +57,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
 export default function ChatInterface() {
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: Role.MODEL, text: "Olá! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
+    { role: Role.MODEL, text: "Hello! I'm your Gemini assistant. How can I help you today?" }
   ]);
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -112,70 +65,24 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 1. Ler a chave da API do Gemini do query parameter da URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const apiKey = urlParams.get('apiKey');
-    
-    if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey.startsWith('AIzaSy')) {
-        setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
-        setIsLoading(false);
-        return;
-    }
-    
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       const chatSession = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-          systemInstruction: `Você é o MaiaCred AI, um assistente de dados amigável e útil para um agente de crédito.
-          Sua principal função é responder perguntas sobre os dados do usuário (clientes, contratos, bancos) usando a ferramenta 'queryDatabase'.
-          
-          Regras:
-          1. Use a ferramenta 'queryDatabase' sempre que o usuário fizer uma pergunta que exija dados do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?').
-          2. O resultado da consulta será um array de objetos JSON. Analise esses dados para fornecer uma resposta concisa e útil.
-          3. Se a consulta retornar um array vazio, informe ao usuário que não há dados correspondentes.
-          4. Formate valores monetários em Reais (R$).
-          5. Mantenha o tom profissional e prestativo.`,
+          systemInstruction: 'You are a helpful and friendly chatbot. Provide clear and concise answers.',
         },
-        tools: [{ functionDeclarations: [databaseQueryTool] }],
       });
       setChat(chatSession);
     } catch (e) {
       console.error(e);
-      setError('Falha ao inicializar o modelo de chat. Verifique sua chave API.');
+      setError('Failed to initialize the chat model. Please check your API key.');
     }
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-
-  // Função para chamar a Edge Function do Supabase
-  const callSupabaseEdgeFunction = async (toolCall: DatabaseQueryTool) => {
-    // Usar o cliente Supabase importado diretamente
-    const session = await supabaseClient.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    if (!token) {
-      throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
-    }
-
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(toolCall),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Erro na Edge Function: ${response.statusText} - ${errorText}`);
-    }
-
-    return response.json();
-  };
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -191,65 +98,22 @@ export default function ChatInterface() {
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
 
     try {
-      let currentMessageIndex = messages.length + 1;
-      let response = await chat.sendMessage({ message: input });
-      
-      // Loop para lidar com Tool Calling
-      while (response.functionCalls && response.functionCalls.length > 0) {
-        const toolCall = response.functionCalls[0];
-        const toolName = toolCall.name;
-        const toolArgs = toolCall.args as DatabaseQueryTool;
-        
-        // 1. Atualizar a mensagem com a chamada da ferramenta
-        setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
-            newMessages[currentMessageIndex - 1].text = 'Aguarde, consultando o banco de dados...';
-            return newMessages;
-        });
-
-        let toolResult: any;
-        
-        if (toolName === 'queryDatabase') {
-          toolResult = await callSupabaseEdgeFunction(toolArgs);
-        } else {
-          toolResult = { error: `Ferramenta desconhecida: ${toolName}` };
-        }
-        
-        // 2. Atualizar a mensagem com o resultado da ferramenta
-        setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].toolResponse = toolResult;
-            return newMessages;
-        });
-
-        // 3. Enviar o resultado da ferramenta de volta para o Gemini
-        response = await chat.sendMessage({
-          toolResponse: [{
-            functionCall: toolCall,
-            response: toolResult,
-          }],
-        });
-      }
-      
-      // 4. Stream da resposta final
+      const stream = await chat.sendMessageStream({ message: input });
       let text = '';
-      const stream = await chat.sendMessageStream({ message: response.text });
       for await (const chunk of stream) {
         text += chunk.text;
         setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].text = text;
+            newMessages[newMessages.length - 1].text = text;
             return newMessages;
         });
       }
-
     } catch (e) {
       console.error(e);
-      const errorMessage = e instanceof Error ? e.message : 'Ocorreu um erro desconhecido.';
-      setError(`Erro: ${errorMessage}`);
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(`Error: ${errorMessage}`);
       setMessages(prev => prev.slice(0, -1)); // Remove the placeholder
-      setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro. ${errorMessage}` }]);
+      setMessages(prev => [...prev, { role: Role.MODEL, text: `Sorry, I encountered an error. ${errorMessage}` }]);
     } finally {
       setIsLoading(false);
     }
@@ -285,7 +149,7 @@ export default function ChatInterface() {
             type="text"
             value={input}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
-            placeholder="Pergunte ao MaiaCred AI..."
+            placeholder="Ask Gemini anything..."
             disabled={isLoading}
             className="flex-1 w-full bg-gray-700 text-white placeholder-gray-400 px-4 py-2 rounded-full focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50 transition-shadow"
           />
