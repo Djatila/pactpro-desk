@@ -74,11 +74,17 @@ const MessageBubble = ({ message, isStreaming }) => {
     ? 'bg-blue-600 self-end rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
     : 'bg-gray-700 self-start rounded-tr-2xl rounded-tl-2xl rounded-br-2xl';
 
+  // Condição robusta para mostrar o loading:
+  // 1. É uma mensagem do modelo (bot)
+  // 2. O texto está vazio OU o texto é 'Analisando dados...' (se tivermos voltado a usar o placeholder)
+  // 3. O chat está em streaming (isStreaming é true)
+  const showLoading = message.role === Role.MODEL && isStreaming && message.text.length === 0;
+
   return (
     <div className={`flex items-start gap-3 w-full max-w-2xl mx-auto ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       {isUser ? <UserIcon /> : <BotIcon />}
       <div className={`px-4 py-3 text-white ${bubbleClasses}`}>
-        {message.text.length === 0 && isStreaming && <LoadingIndicator />}
+        {showLoading && <LoadingIndicator />}
         <p className="whitespace-pre-wrap">{message.text}</p>
         {isStreaming && message.role === Role.MODEL && <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />}
         
