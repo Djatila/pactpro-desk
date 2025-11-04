@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Chatbot",
+  "description": "An elegant chatbot application powered by the Gemini API (gemini-2.5-flash) that allows users to ask questions and receive real-time, streaming responses.",
+  "requestFramePermissions": []
+}
