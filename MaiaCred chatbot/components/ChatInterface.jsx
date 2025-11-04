@@ -194,17 +194,19 @@ export default function ChatInterface() {
     if (!input.trim() || isLoading || !chat) return;
 
     const userMessage = { role: Role.USER, text: input };
+    
+    // Adicionar a mensagem do usuário
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
     setError(null);
     
-    // Add a placeholder for the model's response
+    // Adicionar um placeholder para a resposta do modelo
+    let currentMessageIndex = messages.length + 1;
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
 
     try {
-      let currentMessageIndex = messages.length + 1;
-      let response = await chat.sendMessage({ message: input });
+      let response = await chat.sendMessage({ message: userMessage.text });
       
       // Loop para lidar com Tool Calling
       while (response.functionCalls && response.functionCalls.length > 0) {
@@ -254,14 +256,16 @@ export default function ChatInterface() {
       
       if (response.text) {
         // Se a resposta final tiver texto, fazemos o stream para o usuário
-        text = response.text;
-        
-        // Atualizar a mensagem final com o texto completo
-        setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].text = text;
-            return newMessages;
-        });
+        // CORREÇÃO: Usar o stream para a resposta final, garantindo que o texto seja exibido
+        const stream = await chat.sendMessageStream({ message: response.text });
+        for await (const chunk of stream) {
+          text += chunk.text;
+          setMessages(prev => {
+              const newMessages = [...prev];
+              newMessages[currentMessageIndex - 1].text = text;
+              return newMessages;
+          });
+        }
       } else {
         // Se não houver texto, o modelo falhou em gerar a resposta final.
         console.warn("Modelo não gerou texto após a tool call. Resposta:", response);
