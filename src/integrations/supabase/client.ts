@@ -139,5 +139,10 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
   }
 }
 
+// Expor o cliente Supabase globalmente
+if (typeof window !== 'undefined') {
+  (window as any).maiacredSupabaseClient = supabaseClient;
+}
+
 export { supabaseClient };
 export default supabaseClient;
