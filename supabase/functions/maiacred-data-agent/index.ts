@@ -43,12 +43,8 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
 async function queryDatabase(userId: string, tableName: string, filters: Record<string, any> = {}) {
   console.log(`Consultando tabela: ${tableName} para user: ${userId}`);
   
+  // Simplificando a seleção para '*' para evitar erros de sintaxe na lista de colunas
   let selectColumns = '*';
-  
-  // Otimização: Se for contratos, selecione apenas as colunas necessárias para métricas
-  if (tableName === 'contratos') {
-    selectColumns = 'id, valor_total, status, tipo_contrato, data_emprestimo, parcelas, taxa, valor_operacao, valor_solicitado, valor_prestacao';
-  }
   
   let query = supabaseAdmin.from(tableName).select(selectColumns);
   
@@ -62,8 +58,8 @@ async function queryDatabase(userId: string, tableName: string, filters: Record<
     }
   }
   
-  // Limitar o número de resultados para evitar sobrecarga
-  query = query.limit(50); 
+  // Aumentar o limite para 100 resultados
+  query = query.limit(100); 
 
   const { data, error } = await query;
 
