@@ -20,10 +20,11 @@ export default defineConfig(({ mode }) => {
     }
   }
   
-  // Adicionar a chave Gemini como fallback se não estiver definida (para garantir que o chatbot carregue no ambiente Lovable)
+  // A chave VITE_GEMINI_API_KEY deve ser definida no .env.local
   if (!define['import.meta.env.VITE_GEMINI_API_KEY']) {
-    // Usando a chave que você forneceu como fallback para o ambiente de desenvolvimento/preview
-    define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify('AIzaSyDip_VjC1J3BZE3qgiOIanHEW6DNV1FdI4');
+    console.warn('⚠️ VITE_GEMINI_API_KEY não está definida. O chatbot pode não funcionar.');
+    // Definir como string vazia para evitar erro de referência, mas o chatbot deve falhar com erro 401/503
+    define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify('');
   }
   
   return {
