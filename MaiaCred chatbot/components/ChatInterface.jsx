@@ -174,21 +174,26 @@ export default function ChatInterface() {
       throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
 
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(toolCall),
-    });
+    try {
+      const response = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(toolCall),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Erro na Edge Function: ${response.statusText} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro na Edge Function: ${response.statusText} - ${errorText}`);
+      }
+
+      return response.json();
+    } catch (networkError) {
+      console.error("Erro de rede/timeout na Edge Function:", networkError);
+      throw new Error(`Falha na comunicação com o servidor de dados. Verifique sua conexão ou tente novamente.`);
     }
-
-    return response.json();
   };
 
   const handleSend = async (e) => {
@@ -260,7 +265,7 @@ export default function ChatInterface() {
           // Acumular o texto
           if (chunk.text) {
             text += chunk.text;
-            // Atualizar o estado com o texto acumulado
+            // Usar a função de atualização para garantir o estado mais recente
             setMessages(prev => {
                 const newMessages = [...prev];
                 newMessages[currentMessageIndex - 1].text = text;
@@ -280,9 +285,6 @@ export default function ChatInterface() {
         }
       }
       
-      // Não é necessário garantir o texto final aqui, pois o último setMessages dentro do loop for await já deve ter o texto completo.
-      // Apenas garantir que o isLoading seja false no finally.
-
     } catch (e) {
       console.error(e);
       
