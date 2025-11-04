@@ -204,6 +204,7 @@ export default function ChatInterface() {
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.error) {
+            // Lançar o erro exato retornado pela Edge Function
             throw new Error(`Erro do Servidor (${response.status}): ${errorJson.error}`);
           }
         } catch (e) {
@@ -313,7 +314,7 @@ export default function ChatInterface() {
       }
       
     } catch (e) {
-      console.error(e);
+      console.error("ERRO CRÍTICO NO CHATBOT:", e);
       
       let errorMessage = 'Ocorreu um erro desconhecido.';
       if (e instanceof Error) {
