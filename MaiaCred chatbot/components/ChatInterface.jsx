@@ -218,7 +218,7 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
-            newMessages[currentMessageIndex - 1].text = 'Aguarde, consultando o banco de dados...';
+            // Não definimos o texto aqui, confiamos no streaming para preencher
             return newMessages;
         });
 
@@ -234,6 +234,8 @@ export default function ChatInterface() {
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[currentMessageIndex - 1].toolResponse = toolResult;
+            // Adicionar um texto temporário para indicar que a resposta está sendo gerada
+            newMessages[currentMessageIndex - 1].text = 'Analisando dados...';
             return newMessages;
         });
 
