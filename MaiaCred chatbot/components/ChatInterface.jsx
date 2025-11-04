@@ -252,18 +252,32 @@ export default function ChatInterface() {
       
       // 4. Stream da resposta final
       let text = '';
-      // Se a resposta final for um objeto de texto, use-o. Caso contrário, use a resposta completa.
-      const finalMessage = response.text || JSON.stringify(response);
       
-      const stream = await chat.sendMessageStream({ message: finalMessage });
-      for await (const chunk of stream) {
-        text += chunk.text;
+      // Se a resposta final for um objeto de texto, use-o. Caso contrário, use a resposta completa.
+      // Se response.text for undefined, o stream falhará.
+      if (response.text) {
+        const stream = await chat.sendMessageStream({ message: response.text });
+        for await (const chunk of stream) {
+          text += chunk.text;
+          setMessages(prev => {
+              const newMessages = [...prev];
+              newMessages[currentMessageIndex - 1].text = text;
+              return newMessages;
+          });
+        }
+      } else {
+        // Se não houver texto, mas a resposta for válida (ex: apenas tool calls), 
+        // o loop while deve ter terminado e a resposta final deve ser gerada.
+        // Se chegarmos aqui, significa que o modelo não gerou texto após a tool call.
+        // Isso pode ser um problema de prompt ou de configuração.
+        console.warn("Modelo não gerou texto após a tool call. Resposta:", response);
         setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].text = text;
+            newMessages[currentMessageIndex - 1].text = 'Consulta concluída, mas o modelo não gerou uma resposta em texto. Tente reformular a pergunta.';
             return newMessages;
         });
       }
+
 
     } catch (e) {
       console.error(e);
