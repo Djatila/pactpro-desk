@@ -2,18 +2,30 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase'; // Importar o cliente Supabase
 
 export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [supabaseToken, setSupabaseToken] = useState<string | null>(null); // Novo estado para o token
   
   // 1. Obter a chave da API do Gemini do ambiente injetado pelo Vite
-  // Usar o valor injetado pelo vite.config.ts (que inclui o fallback)
   const geminiApiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || 'KEY_NOT_CONFIGURED';
 
   // 2. Construir a URL do chatbot com a chave como query parameter
-  const chatbotUrl = `/MaiaCred chatbot/index.html?apiKey=${geminiApiKey}`;
+  // Incluir o token do Supabase na URL
+  const chatbotUrl = `/MaiaCred chatbot/index.html?apiKey=${geminiApiKey}&supabaseToken=${supabaseToken || ''}`;
+
+  // Efeito para obter o token de sessão do Supabase
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseToken(session?.access_token || null);
+    }).catch(e => {
+      console.error("Erro ao obter token Supabase para chatbot:", e);
+      setSupabaseToken(null);
+    });
+  }, [isOpen]); // Recarregar token ao abrir o chat
 
   const toggleChat = () => {
     setIsOpen(!isOpen);

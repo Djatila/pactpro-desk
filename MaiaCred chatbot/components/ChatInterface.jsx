@@ -3,13 +3,9 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import { Role, ChatMessage, DatabaseQueryTool } from '../types.js';
 // Removido: import { supabaseClient } from '../../src/integrations/supabase/client'; 
 
-// Acessar o cliente Supabase globalmente
+// Acessar o cliente Supabase globalmente (MOCKADO - NÃO USADO)
 const getSupabaseClient = () => {
-  if (typeof window !== 'undefined' && window.maiacredSupabaseClient) {
-    return window.maiacredSupabaseClient;
-  }
-  // Fallback para um cliente mock se não estiver disponível (embora o iframe deva carregar depois do app principal)
-  console.error("Cliente Supabase não encontrado no escopo global.");
+  // Esta função não é mais usada para obter o token, mas mantida como mock para evitar erros de referência
   return {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -122,12 +118,16 @@ export default function ChatInterface() {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
+  // Variável para armazenar o token lido da URL
+  const [supabaseToken, setSupabaseToken] = useState(null);
+
   useEffect(() => {
-    // 1. Ler a chave da API do Gemini do query parameter da URL
     const urlParams = new URLSearchParams(window.location.search);
     const apiKey = urlParams.get('apiKey');
+    const token = urlParams.get('supabaseToken'); // Lendo o token da URL
     
-    // Apenas verificar se a chave está ausente ou é o valor de fallback 'KEY_NOT_CONFIGURED'
+    setSupabaseToken(token);
+
     if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey === 'KEY_NOT_CONFIGURED') {
         setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
@@ -164,14 +164,10 @@ export default function ChatInterface() {
 
   // Função para chamar a Edge Function do Supabase
   const callSupabaseEdgeFunction = async (toolCall) => {
-    const supabaseClient = getSupabaseClient();
-    
-    // Obter token de acesso
-    const sessionResult = await supabaseClient.auth.getSession();
-    const token = sessionResult.data.session?.access_token;
+    const token = supabaseToken; // Usar o token do estado
 
     if (!token) {
-      console.error('ERRO DE AUTENTICAÇÃO: Token não encontrado na sessão.');
+      console.error('ERRO DE AUTENTICAÇÃO: Token não encontrado na URL.');
       throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
     
