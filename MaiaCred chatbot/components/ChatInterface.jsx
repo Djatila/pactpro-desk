@@ -128,6 +128,9 @@ export default function ChatInterface() {
     
     setSupabaseToken(token);
 
+    console.log('DEBUG CHATBOT: API Key (primeiros 10 chars):', apiKey ? apiKey.substring(0, 10) : 'NULO');
+    console.log('DEBUG CHATBOT: Supabase Token (primeiros 10 chars):', token ? token.substring(0, 10) : 'NULO');
+
     if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey === 'KEY_NOT_CONFIGURED') {
         setError('Chave da API do Gemini não configurada. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
