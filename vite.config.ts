@@ -20,11 +20,12 @@ export default defineConfig(({ mode }) => {
     }
   }
   
-  // A chave VITE_GEMINI_API_KEY deve ser definida no .env.local
-  if (!define['import.meta.env.VITE_GEMINI_API_KEY']) {
-    console.warn('⚠️ VITE_GEMINI_API_KEY não está definida. O chatbot pode não funcionar.');
-    // Definir como string vazia para evitar erro de referência, mas o chatbot deve falhar com erro 401/503
-    define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify('');
+  // Injetar a chave Gemini fornecida pelo usuário
+  const geminiApiKey = env.VITE_GEMINI_API_KEY || "AIzaSyB2UNiDPJYfi2YTKdrVHUOc8Zm7sU5lNks";
+  define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify(geminiApiKey);
+  
+  if (geminiApiKey === "AIzaSyB2UNiDPJYfi2YTKdrVHUOc8Zm7sU5lNks") {
+    console.warn('⚠️ Usando chave Gemini hardcoded. Recomenda-se definir VITE_GEMINI_API_KEY no .env.local.');
   }
   
   return {
