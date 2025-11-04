@@ -178,7 +178,8 @@ export default function ChatInterface() {
       throw new Error('Usuário não autenticado. Por favor, faça login no aplicativo principal.');
     }
     
-    console.log('Token de autenticação obtido (primeiros 10 caracteres):', token.substring(0, 10));
+    console.log('DEBUG EDGE CALL: Token de autenticação obtido (primeiros 10 caracteres):', token.substring(0, 10));
+    console.log('DEBUG EDGE CALL: Chamando Edge Function com:', toolCall);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout de 15 segundos
