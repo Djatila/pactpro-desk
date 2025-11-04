@@ -43,7 +43,14 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
 async function queryDatabase(userId: string, tableName: string, filters: Record<string, any> = {}) {
   console.log(`Consultando tabela: ${tableName} para user: ${userId}`);
   
-  let query = supabaseAdmin.from(tableName).select('*');
+  let selectColumns = '*';
+  
+  // Otimização: Se for contratos, selecione apenas as colunas necessárias para métricas
+  if (tableName === 'contratos') {
+    selectColumns = 'id, valor_total, status, tipo_contrato, data_emprestimo, parcelas, taxa, valor_operacao, valor_solicitado, valor_prestacao';
+  }
+  
+  let query = supabaseAdmin.from(tableName).select(selectColumns);
   
   // Aplicar filtro obrigatório de RLS (segurança)
   query = query.eq('user_id', userId);
