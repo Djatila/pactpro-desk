@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          '@': path.resolve(__dirname, '.'),
+          // Corrigido para apontar para o diretório 'src' do projeto pai
+          '@': path.resolve(__dirname, '../src'),
         }
       }
     };
