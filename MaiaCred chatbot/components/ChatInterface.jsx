@@ -111,7 +111,7 @@ const MessageBubble = ({ message, isStreaming }) => {
 export default function ChatInterface() {
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([
-    { role: Role.MODEL, text: "Olá Binho! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
+    { role: Role.MODEL, text: "Olá! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -143,11 +143,12 @@ export default function ChatInterface() {
         model: 'gemini-2.5-flash',
         config: {
           systemInstruction: `Você é o MaiaCred AI, um assistente de dados amigável e útil para um agente de crédito.
-          Sua principal função é responder perguntas sobre os dados do usuário (clientes, contratos, bancos) usando a ferramenta 'queryDatabase'.
           
-          **REGRA CRÍTICA: SEMPRE use a ferramenta 'queryDatabase' para qualquer pergunta que envolva contagem, listagem, soma ou recuperação de dados de clientes, contratos, bancos ou configurações.**
+          **INSTRUÇÃO CRÍTICA:** Você TEM acesso aos dados do usuário através da ferramenta 'queryDatabase'.
           
-          Exemplos de perguntas que exigem a ferramenta: 'Quantos contratos ativos eu tenho?', 'Qual o nome dos meus clientes?', 'Qual a minha meta anual?'.
+          **REGRA DE USO DA FERRAMENTA:** Para QUALQUER pergunta que envolva dados do sistema (clientes, contratos, bancos, configurações), você DEVE usar a ferramenta 'queryDatabase'. Nunca responda com frases como "Eu não tenho acesso aos seus dados".
+          
+          Exemplos de perguntas que exigem a ferramenta: 'Quantos clientes eu tenho?', 'Qual o valor total dos contratos ativos?', 'Qual a minha meta anual?'.
           
           Regras de Formatação:
           1. O resultado da consulta será um array de objetos JSON. Analise esses dados para fornecer uma resposta concisa e útil.
