@@ -1144,7 +1144,7 @@ export function DataProvider({ children }: DataProviderProps) {
         throw error;
       }
       
-      // Se não houver tipos cadastrados, inserir os padrões
+      // Se não houver tipos cadastrados, usar os padrões localmente
       if (!data || data.length === 0) {
         const tiposDefault = [
           { value: 'consignado-previdencia', label: 'Consignado Previdência', is_default: true },
@@ -1156,22 +1156,7 @@ export function DataProvider({ children }: DataProviderProps) {
           { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', is_default: true }
         ];
         
-        // Inserir tipos padrão
-        const tiposInsert = tiposDefault.map(tipo => ({
-          ...tipo,
-          user_id: user.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('tipos_contrato')
-          .insert(tiposInsert);
-          
-        if (insertError) {
-          console.error('Erro ao inserir tipos de contrato padrão:', insertError);
-          // Mesmo se falhar, retornar os tipos padrão
-          return tiposDefault;
-        }
-        
+        // Retornar tipos padrão sem tentar inserir (evita erro de RLS)
         return tiposDefault;
       }
       

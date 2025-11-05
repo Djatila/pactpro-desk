@@ -1,3 +1,10 @@
+// ============================================
+// EDGE FUNCTION COMPLETA - COPIE E COLE NO SUPABASE DASHBOARD
+// ============================================
+// URL: https://supabase.com/dashboard/project/emvnudlonqoyfptrdwtd/functions
+// Clique em "maiacred-data-agent" e substitua TODO o código
+// ============================================
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -9,10 +16,9 @@ const corsHeaders = {
 };
 
 // Tipos de operação suportadas
-type OperationType = 'query' | 'aggregate' | 'stats' | 'search' | 'topBancos' | 'contratosVencendo' | 'dashboardSummary' | 'clientesAtivos' | 'contratosPorCliente';
+type OperationType = 'query' | 'aggregate' | 'stats' | 'search' | 'topBancos' | 'contratosVencendo' | 'dashboardSummary';
 
 // Inicializa o cliente Supabase com a chave Service Role (acesso total)
-// A chave SERVICE_ROLE_KEY é injetada automaticamente pelo ambiente Supabase
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -33,8 +39,6 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
   }
   const token = authHeader.replace('Bearer ', '');
   
-  // Usar o cliente admin para verificar o token
-  // Nota: O RLS é ignorado aqui porque estamos usando a chave Service Role
   const { data, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !data.user) {
@@ -72,7 +76,6 @@ async function queryDatabase(userId: string, tableName: string, filters: Record<
     }
   }
   
-  // Aumentar o limite para 100 resultados
   query = query.limit(100); 
 
   const { data, error } = await query;
@@ -196,7 +199,6 @@ async function getContratosVencendo(userId: string, meses: number = 3) {
       const [day, month, year] = c.data_emprestimo.split('/');
       const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       
-      // Calcular meses passados
       const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
       const diffMonths = hoje.getMonth() - dataInicio.getMonth();
       const totalMonthsPassed = diffYears * 12 + diffMonths;
@@ -217,7 +219,6 @@ async function getContratosVencendo(userId: string, meses: number = 3) {
 async function getMetaProgress(userId: string) {
   console.log(`DEBUG: Obtendo progresso da meta para user: ${userId}`);
   
-  // Buscar meta anual
   const { data: config, error: configError } = await supabaseAdmin
     .from('configuracoes')
     .select('meta_anual')
@@ -229,7 +230,6 @@ async function getMetaProgress(userId: string) {
     return { error: configError.message };
   }
 
-  // Buscar receita atual
   const { data: contratos, error: contratosError } = await supabaseAdmin
     .from('contratos')
     .select('valor_total, taxa, status')
@@ -258,105 +258,6 @@ async function getMetaProgress(userId: string) {
   return { data: resultado };
 }
 
-// Função para obter APENAS clientes ativos (com pelo menos um contrato ativo)
-async function getClientesAtivos(userId: string) {
-  console.log(`DEBUG: Obtendo clientes ativos para user: ${userId}`);
-  
-  try {
-    // Buscar TODOS os contratos ativos primeiro
-    const { data: contratosAtivos, error: contratosError } = await supabaseAdmin
-      .from('contratos')
-      .select('cliente_id')
-      .eq('user_id', userId)
-      .eq('status', 'ativo');
-    
-    if (contratosError) {
-      console.error('DEBUG: Erro ao buscar contratos ativos:', contratosError);
-      return { error: contratosError.message };
-    }
-    
-    // Se não há contratos ativos, retornar array vazio
-    if (!contratosAtivos || contratosAtivos.length === 0) {
-      console.log('DEBUG: Nenhum contrato ativo encontrado');
-      return { data: [] };
-    }
-    
-    // Pegar IDs únicos dos clientes com contratos ativos
-    const clienteIdsAtivos = [...new Set(contratosAtivos.map(c => c.cliente_id))];
-    console.log(`DEBUG: ${clienteIdsAtivos.length} cliente(s) com contratos ativos`);
-    
-    // Buscar os dados completos desses clientes
-    const { data: clientes, error: clientesError } = await supabaseAdmin
-      .from('clientes')
-      .select('*')
-      .eq('user_id', userId)
-      .in('id', clienteIdsAtivos);
-    
-    if (clientesError) {
-      console.error('DEBUG: Erro ao buscar clientes:', clientesError);
-      return { error: clientesError.message };
-    }
-    
-    console.log(`DEBUG: ${clientes.length} cliente(s) ativo(s) encontrado(s)`);
-    return { data: clientes };
-  } catch (error) {
-    console.error('DEBUG: Erro ao obter clientes ativos:', error);
-    return { error: error.message };
-  }
-}
-
-// Função para obter contratos por nome do cliente
-async function getContratosPorCliente(userId: string, clienteNome: string) {
-  console.log(`DEBUG: Obtendo contratos para cliente: ${clienteNome}, user: ${userId}`);
-  
-  try {
-    // Primeiro, buscar o cliente pelo nome
-    const { data: clientes, error: clienteError } = await supabaseAdmin
-      .from('clientes')
-      .select('id, nome')
-      .eq('user_id', userId)
-      .ilike('nome', `%${clienteNome}%`);
-    
-    if (clienteError) {
-      console.error('DEBUG: Erro ao buscar cliente:', clienteError);
-      return { error: clienteError.message };
-    }
-    
-    if (!clientes || clientes.length === 0) {
-      return { error: `Cliente "${clienteNome}" não encontrado` };
-    }
-    
-    console.log(`DEBUG: Cliente(s) encontrado(s): ${clientes.map(c => c.nome).join(', ')}`);
-    
-    // Buscar contratos dos clientes encontrados
-    const clienteIds = clientes.map(c => c.id);
-    const { data: contratos, error: contratosError } = await supabaseAdmin
-      .from('contratos')
-      .select(`
-        *,
-        clientes(id, nome, cpf, telefone, email, endereco),
-        bancos(id, nome, codigo, taxa_media)
-      `)
-      .eq('user_id', userId)
-      .in('cliente_id', clienteIds);
-    
-    if (contratosError) {
-      console.error('DEBUG: Erro ao buscar contratos:', contratosError);
-      return { error: contratosError.message };
-    }
-    
-    if (!contratos || contratos.length === 0) {
-      return { error: `Nenhum contrato encontrado para o cliente "${clienteNome}"` };
-    }
-    
-    console.log(`DEBUG: ${contratos.length} contrato(s) encontrado(s)`);
-    return { data: contratos };
-  } catch (error) {
-    console.error('DEBUG: Erro ao obter contratos por cliente:', error);
-    return { error: error.message };
-  }
-}
-
 // Função para obter resumo completo do dashboard
 async function getDashboardSummary(userId: string) {
   console.log(`DEBUG: Obtendo resumo do dashboard para user: ${userId}`);
@@ -369,10 +270,6 @@ async function getDashboardSummary(userId: string) {
       .eq('user_id', userId);
     
     if (clientesError) throw clientesError;
-    
-    // Buscar clientes ativos
-    const clientesAtivosResult = await getClientesAtivos(userId);
-    if (clientesAtivosResult.error) throw new Error(clientesAtivosResult.error);
     
     // Buscar estatísticas de contratos
     const statsResult = await getContratosStats(userId);
@@ -388,7 +285,6 @@ async function getDashboardSummary(userId: string) {
     
     const resumo = {
       totalClientes: clientes.length,
-      clientesAtivos: clientesAtivosResult.data.length,
       contratos: statsResult.data,
       topBancos: topBancosResult.data,
       meta: metaResult.data,
@@ -403,7 +299,6 @@ async function getDashboardSummary(userId: string) {
 }
 
 serve(async (req) => {
-  // Lidar com requisições OPTIONS (CORS preflight)
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -426,7 +321,6 @@ serve(async (req) => {
 
     let result;
 
-    // Roteamento baseado na operação
     switch (operation as OperationType) {
       case 'query':
         if (!tableName) {
@@ -436,7 +330,6 @@ serve(async (req) => {
           });
         }
         
-        // Lista de tabelas permitidas
         const allowedTables = ['clientes', 'bancos', 'contratos', 'configuracoes', 'tipos_contrato', 'profiles'];
         if (!allowedTables.includes(tableName)) {
           return new Response(JSON.stringify({ error: 'Access denied to this table' }), {
@@ -476,21 +369,6 @@ serve(async (req) => {
 
       case 'dashboardSummary':
         result = await getDashboardSummary(userId);
-        break;
-
-      case 'clientesAtivos':
-        result = await getClientesAtivos(userId);
-        break;
-
-      case 'contratosPorCliente':
-        const { clienteNome } = body;
-        if (!clienteNome) {
-          return new Response(JSON.stringify({ error: 'Missing clienteNome parameter' }), {
-            status: 400,
-            headers: corsHeaders,
-          });
-        }
-        result = await getContratosPorCliente(userId, clienteNome);
         break;
 
       default:

@@ -61,11 +61,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('Carregando perfil do usuário:', supabaseUser.id);
       
       // Tentar carregar perfil da tabela profiles
-      const { data: profile, error: profileError } = await withTimeout(
+      const result = await withTimeout(
         supabase.from('profiles').select('*').eq('id', supabaseUser.id).single(),
         5000, // 5 segundos para carregar perfil da tabela
         'Timeout ao carregar perfil do usuário.'
       );
+      const { data: profile, error: profileError } = result as any;
 
       if (!profileError && profile) {
         const completeUserData: User = {
@@ -109,6 +110,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let isMounted = true;
+    
+    // Timeout de segurança: se após 8 segundos ainda estiver carregando, forçar parada
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn('⚠️ Timeout de segurança ativado - forçando fim do loading');
+        setIsLoading(false);
+        setError('Timeout ao verificar autenticação. Tente recarregar a página.');
+      }
+    }, 8000);
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
@@ -154,6 +165,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -165,7 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Tentando registrar usuário:', data.email);
       
-      const { data: authData, error: authError } = await withTimeout(
+      const authResult = await withTimeout(
         supabase.auth.signUp({
           email: data.email,
           password: data.password,
@@ -180,6 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         15000, // 15 segundos para registro
         'Timeout ao registrar usuário.'
       );
+      const { data: authData, error: authError } = authResult as any;
 
       console.log('Resposta do registro:', { authData, authError });
 
@@ -223,7 +236,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Tentando fazer login com:', email);
       
-      const { data: authData, error: authError } = await withTimeout(
+      const authResult = await withTimeout(
         supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password
@@ -231,6 +244,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         15000, // 15 segundos para login
         'Timeout ao fazer login.'
       );
+      const { data: authData, error: authError } = authResult as any;
 
       console.log('Resposta do login:', { authData, authError });
 
@@ -294,11 +308,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Tentar fazer logout no Supabase com timeout menor
       try {
-        const { error } = await withTimeout(
+        const logoutResult = await withTimeout(
           supabase.auth.signOut(),
           3000, // Timeout de apenas 3 segundos
           'Timeout no logout do Supabase.'
         );
+        const { error } = logoutResult as any;
         
         if (error) {
           console.warn('Aviso no logout do Supabase:', error.message);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
-import { GoogleGenAI, Chat } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Role, ChatMessage, DatabaseQueryTool } from '../types.js';
 // Removido: import { supabaseClient } from '../../src/integrations/supabase/client'; 
 
@@ -18,25 +18,91 @@ const getSupabaseClient = () => {
 const SUPABASE_PROJECT_ID = 'emvnudlonqoyfptrdwtd'; 
 const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/maiacred-data-agent`;
 
-// --- Definição da Ferramenta Gemini (Tool Calling) ---
-const databaseQueryTool = {
-  name: 'queryDatabase',
-  description: `Consulta o banco de dados MaiaCred para obter informações sobre clientes, contratos, bancos ou configurações. Use esta ferramenta sempre que o usuário perguntar sobre dados específicos do sistema (ex: 'quantos clientes eu tenho?', 'qual o valor total dos contratos ativos?', 'qual o meu nome?').`,
-  parameters: {
-    type: 'OBJECT',
-    properties: {
-      tableName: {
-        type: 'STRING',
-        description: 'O nome da tabela a ser consultada (clientes, contratos, bancos, configuracoes, tipos_contrato, profiles).',
+// --- Definição das Ferramentas Gemini (Tool Calling) ---
+const databaseTools = [
+  {
+    name: 'queryDatabase',
+    description: `Consulta simples no banco de dados MaiaCred. Use para listar dados de tabelas específicas com filtros opcionais. Retorna array de objetos. Exemplos: listar todos os clientes, buscar contratos ativos, obter dados de um banco específico.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        tableName: {
+          type: 'string',
+          description: 'Nome da tabela: clientes, contratos, bancos, configuracoes, tipos_contrato, profiles',
+        },
+        filters: {
+          type: 'object',
+          description: 'Filtros opcionais (ex: { status: "ativo" })',
+        },
       },
-      filters: {
-        type: 'OBJECT',
-        description: 'Filtros opcionais para a consulta (ex: { status: "ativo" }).',
+      required: ['tableName'],
+    },
+  },
+  {
+    name: 'getContratosStats',
+    description: `Obtém estatísticas agregadas dos contratos: total de contratos, quantidade por status (ativos, pendentes, finalizados), valor total, receita total e total de parcelas. Use quando o usuário perguntar sobre números gerais, totais ou estatísticas dos contratos.`,
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'getTopBancos',
+    description: `Retorna ranking dos bancos por volume de contratos. Mostra nome do banco, código, total de contratos e volume total. Use quando o usuário perguntar sobre quais bancos têm mais contratos ou maior volume.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Número de bancos a retornar (padrão: 5)',
+        },
       },
     },
-    required: ['tableName'],
   },
-};
+  {
+    name: 'searchCliente',
+    description: `Busca clientes por nome ou CPF (busca parcial, case-insensitive). Retorna até 10 resultados. Use quando o usuário quiser encontrar um cliente específico pelo nome ou CPF.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Texto de busca (nome ou CPF do cliente)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'getContratosVencendo',
+    description: `Retorna contratos ativos que estão próximos do vencimento (baseado no número de parcelas restantes). Use quando o usuário perguntar sobre contratos que vão terminar em breve ou que precisam de atenção.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        meses: {
+          type: 'number',
+          description: 'Número de meses para considerar (padrão: 3)',
+        },
+      },
+    },
+  },
+  {
+    name: 'getMetaProgress',
+    description: `Retorna informações sobre a meta anual do agente: meta anual, receita atual, percentual atingido, valor faltante e se a meta foi atingida. Use quando o usuário perguntar sobre a meta, progresso ou quanto falta para atingir o objetivo.`,
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'getDashboardSummary',
+    description: `Retorna um resumo completo das principais estatísticas do dashboard: total de clientes, contratos (ativos/pendentes/finalizados), receita total, meta anual, progresso da meta, top 3 bancos. Use quando o usuário pedir um resumo geral, visão geral, estatísticas principais ou overview do sistema.`,
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
 
 // --- Helper Components (Defined outside the main component to prevent re-creation on re-renders) ---
 
@@ -80,27 +146,7 @@ const MessageBubble = ({ message, isStreaming }) => {
         <p className="whitespace-pre-wrap">{message.text}</p>
         {isStreaming && message.role === Role.MODEL && <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />}
         
-        {/* Exibir chamada de ferramenta */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 p-2 bg-gray-600 rounded-lg text-xs text-yellow-300">
-            <p className="font-semibold">⚙️ Chamando Ferramenta:</p>
-            {message.toolCalls.map((call, i) => (
-              <pre key={i} className="mt-1 whitespace-pre-wrap break-words">
-                {JSON.stringify(call.functionCall, null, 2)}
-              </pre>
-            ))}
-          </div>
-        )}
-        
-        {/* Exibir resposta da ferramenta */}
-        {message.toolResponse && (
-          <div className="mt-2 p-2 bg-gray-600 rounded-lg text-xs text-green-300">
-            <p className="font-semibold">✅ Dados Recebidos:</p>
-            <pre className="mt-1 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
-              {JSON.stringify(message.toolResponse, null, 2)}
-            </pre>
-          </div>
-        )}
+        {/* Tool calls e respostas ocultos - apenas para debug no console */}
       </div>
     </div>
   );
@@ -138,26 +184,63 @@ export default function ChatInterface() {
     }
     
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const chatSession = ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-          systemInstruction: `Você é o MaiaCred AI, um assistente de dados amigável e útil para um agente de crédito.
-          
-          **INSTRUÇÃO CRÍTICA:** Você TEM acesso aos dados do usuário através da ferramenta 'queryDatabase'.
-          
-          **REGRA DE USO DA FERRAMENTA:** Para QUALQUER pergunta que envolva dados do sistema (clientes, contratos, bancos, configurações), você DEVE usar a ferramenta 'queryDatabase'. Nunca responda com frases como "Eu não tenho acesso aos seus dados".
-          
-          Exemplos de perguntas que exigem a ferramenta: 'Quantos clientes eu tenho?', 'Qual o valor total dos contratos ativos?', 'Qual a minha meta anual?'.
-          
-          Regras de Formatação:
-          1. O resultado da consulta será um array de objetos JSON. Analise esses dados para fornecer uma resposta concisa e útil.
-          2. Se a consulta retornar um array vazio, informe ao usuário que não há dados correspondentes.
-          3. Formate valores monetários em Reais (R$).
-          4. Mantenha o tom profissional e prestativo.`,
-        },
-        tools: [{ functionDeclarations: [databaseQueryTool] }],
+      const genAI = new GoogleGenerativeAI(apiKey);
+      
+      // Todas as 6 ferramentas disponíveis
+      const allTools = [{
+        functionDeclarations: databaseTools
+      }];
+      
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash-latest',
+        tools: allTools,
+        systemInstruction: `Você é o MaiaCred AI, um assistente de dados inteligente para agentes de crédito.
+
+**SUAS CAPACIDADES:**
+Você tem acesso a 7 ferramentas para consultar dados:
+
+1. **getDashboardSummary**: Resumo completo do dashboard (use quando pedir visão geral/resumo)
+2. **queryDatabase**: Consultas simples em tabelas (clientes, contratos, bancos, etc.)
+3. **getContratosStats**: Estatísticas agregadas dos contratos
+4. **getTopBancos**: Ranking de bancos por volume
+5. **searchCliente**: Busca clientes por nome ou CPF
+6. **getContratosVencendo**: Contratos próximos do vencimento
+7. **getMetaProgress**: Progresso da meta anual
+
+**REGRAS IMPORTANTES:**
+- SEMPRE use as ferramentas para buscar dados reais. NUNCA invente informações.
+- Escolha a ferramenta mais adequada para cada pergunta.
+- Para listar clientes: use queryDatabase com tableName="clientes"
+- Para listar bancos: use queryDatabase com tableName="bancos"
+- Para estatísticas de contratos: use getContratosStats
+
+**FORMATAÇÃO DE RESPOSTAS:**
+- NUNCA mostre JSON bruto. Sempre formate os dados de forma legível.
+- Use listas numeradas ou com marcadores para múltiplos itens.
+- Formate valores monetários como R$ 10.000,00 (com ponto para milhares e vírgula para decimais).
+- Formate datas no padrão brasileiro DD/MM/AAAA.
+- Para listas de bancos, mostre: "🏦 [Nome do Banco] (Código [código]) - [X] contratos - R$ [valor total]"
+- Para listas de clientes, mostre: "👤 [Nome] - CPF: [cpf] - Tel: [telefone]"
+- Para contratos, mostre: "📄 Contrato #[id] - Cliente: [nome] - Banco: [banco] - Valor: R$ [valor]"
+- Seja objetivo, profissional e use emojis para melhorar a legibilidade.
+
+**EXEMPLOS DE FORMATAÇÃO:**
+Pergunta: "Quais bancos têm mais contratos?"
+Resposta: "Aqui estão os bancos com mais contratos:
+
+🏦 **Banco Cooperativo do Brasil** (Código 756)
+   • 1 contrato
+   • Volume total: R$ 6.717,17
+
+🏦 **Santander** (Código 033)
+   • 1 contrato
+   • Volume total: R$ 6.517,77"`,
       });
+      
+      const chatSession = model.startChat({
+        history: [],
+      });
+      
       setChat(chatSession);
     } catch (e) {
       console.error(e);
@@ -229,9 +312,23 @@ export default function ChatInterface() {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || !chat) return;
+    console.log('🚀 handleSend chamado');
+    
+    if (!input.trim()) {
+      console.warn('⚠️ Input vazio');
+      return;
+    }
+    if (isLoading) {
+      console.warn('⚠️ Já está carregando');
+      return;
+    }
+    if (!chat) {
+      console.error('❌ Chat não inicializado');
+      return;
+    }
 
     const userMessage = { role: Role.USER, text: input };
+    console.log('📤 Enviando mensagem:', userMessage.text);
     
     // Adicionar a mensagem do usuário
     setMessages(prev => [...prev, userMessage]);
@@ -244,11 +341,40 @@ export default function ChatInterface() {
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
 
     try {
-      let response = await chat.sendMessage({ message: userMessage.text });
+      console.log('🤖 Chamando Gemini...');
+      const result = await chat.sendMessage(userMessage.text);
+      const response = result.response;
+      
+      console.log('✅ Resposta do Gemini recebida:', response);
+      console.log('📊 Tipo da resposta:', typeof response);
+      console.log('📊 Candidatos:', response.candidates);
+      console.log('📊 Prompt Feedback:', response.promptFeedback);
+      
+      // Tentar obter texto e function calls com tratamento de erro
+      let text = '';
+      let functionCalls = null;
+      
+      try {
+        text = response.text();
+      } catch (textError) {
+        console.warn('⚠️ Erro ao obter texto da resposta:', textError);
+        text = '';
+      }
+      
+      try {
+        functionCalls = response.functionCalls();
+      } catch (fcError) {
+        console.warn('⚠️ Erro ao obter function calls:', fcError);
+        functionCalls = null;
+      }
+      
+      console.log('📝 Text:', text);
+      console.log('🔧 FunctionCalls:', functionCalls);
       
       // Loop para lidar com Tool Calling
-      while (response.functionCalls && response.functionCalls.length > 0) {
-        const toolCall = response.functionCalls[0];
+      while (functionCalls && functionCalls.length > 0) {
+        console.log('🔧 Function calls detectados:', functionCalls);
+        const toolCall = functionCalls[0];
         const toolName = toolCall.name;
         const toolArgs = toolCall.args;
         
@@ -262,8 +388,23 @@ export default function ChatInterface() {
 
         let toolResult;
         
-        if (toolName === 'queryDatabase') {
-          toolResult = await callSupabaseEdgeFunction(toolArgs);
+        // Mapear nome da ferramenta para operação da Edge Function
+        const toolOperationMap = {
+          'queryDatabase': 'query',
+          'getContratosStats': 'stats',
+          'getTopBancos': 'topBancos',
+          'searchCliente': 'search',
+          'getContratosVencendo': 'contratosVencendo',
+          'getMetaProgress': 'aggregate',
+          'getDashboardSummary': 'dashboardSummary',
+        };
+        
+        const operation = toolOperationMap[toolName];
+        
+        if (operation) {
+          // Adicionar operation aos argumentos se não existir
+          const edgeFunctionArgs = { ...toolArgs, operation };
+          toolResult = await callSupabaseEdgeFunction(edgeFunctionArgs);
         } else {
           toolResult = { error: `Ferramenta desconhecida: ${toolName}` };
         }
@@ -276,43 +417,72 @@ export default function ChatInterface() {
             return newMessages;
         });
 
-        // 3. Enviar o resultado da ferramenta de volta para o Gemini e obter o stream
-        const stream = await chat.sendMessageStream({
-          contents: [{
-            role: 'tool',
-            parts: [{
-              functionResponse: {
-                name: toolCall.name,
-                response: toolResult,
-              },
-            }],
-          }],
-        });
+        // 3. Enviar o resultado da ferramenta de volta para o Gemini
+        const result = await chat.sendMessage([{
+          functionResponse: {
+            name: toolName,
+            response: {
+              content: toolResult,
+            },
+          },
+        }]);
         
-        let text = '';
-        let finalResponse = { text: '', functionCalls: [] };
+        const newResponse = result.response;
         
-        for await (const chunk of stream) {
-          // Acumular o texto
-          if (chunk.text) {
-            text += chunk.text;
-            // Usar a função de atualização para garantir o estado mais recente
-            setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[currentMessageIndex - 1].text = text;
-                return newMessages;
-            });
-          }
-          // Capturar a resposta final do stream para verificar se há mais tool calls
-          finalResponse = chunk;
+        // Tentar obter texto e function calls com tratamento de erro
+        let newText = '';
+        let newFunctionCalls = null;
+        
+        try {
+          newText = newResponse.text();
+        } catch (textError) {
+          console.warn('⚠️ Erro ao obter texto da nova resposta:', textError);
+          newText = '';
         }
         
-        // Atualizar a variável de resposta para o próximo ciclo do loop
-        response = finalResponse;
+        try {
+          newFunctionCalls = newResponse.functionCalls();
+        } catch (fcError) {
+          console.warn('⚠️ Erro ao obter novos function calls:', fcError);
+          newFunctionCalls = null;
+        }
         
-        // Se o loop terminar, o texto final já foi gerado pelo stream.
-        if (!response.functionCalls || response.functionCalls.length === 0) {
-            break;
+        console.log('📝 Nova resposta após tool:', newText);
+        console.log('🔧 Novos function calls:', newFunctionCalls);
+        
+        // Atualizar mensagem com o texto final
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[currentMessageIndex - 1].text = newText;
+          return newMessages;
+        });
+        
+        // Se não há mais function calls, terminar o loop
+        if (!newFunctionCalls || newFunctionCalls.length === 0) {
+          console.log('✅ Loop de function calls finalizado');
+          break;
+        }
+        
+        // Atualizar para próxima iteração
+        functionCalls = newFunctionCalls;
+      }
+      
+      // Se não houve function calls e não há texto, exibir o texto ou mensagem de erro
+      if (!functionCalls || functionCalls.length === 0) {
+        if (text) {
+          // Exibir o texto da resposta
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].text = text;
+            return newMessages;
+          });
+        } else {
+          console.warn('⚠️ Resposta vazia do Gemini!');
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
+            return newMessages;
+          });
         }
       }
       
