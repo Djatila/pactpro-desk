@@ -56,14 +56,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
   };
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
+    // SEMPRE definir usuário básico IMEDIATAMENTE para feedback instantâneo
+    const basicUser: User = {
+      id: supabaseUser.id,
+      nome: supabaseUser.user_metadata?.nome || supabaseUser.email?.split('@')[0] || 'Usuário',
+      email: supabaseUser.email || '',
+      cargo: supabaseUser.user_metadata?.cargo || 'Usuário',
+      avatar: supabaseUser.user_metadata?.avatar_url || undefined
+    };
+    
+    setUser(basicUser);
+    localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
+    console.log('✅ Usuário carregado (dados básicos)');
+    
+    // Tentar carregar perfil completo em background (sem bloquear)
     try {
-      console.log('Carregando perfil do usuário:', supabaseUser.id);
-      
-      // Tentar carregar perfil da tabela profiles
       const result = await withTimeout(
         supabase.from('profiles').select('*').eq('id', supabaseUser.id).single(),
-        15000, // 15 segundos para carregar perfil da tabela
-        'Timeout ao carregar perfil do usuário.'
+        3000, // Apenas 3 segundos - se não responder, ignora
+        'Timeout ao carregar Perfil completo'
       );
       const { data: profile, error: profileError } = result as any;
 
@@ -77,31 +88,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
         setUser(completeUserData);
         localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
-      } else {
-        console.log('ℹ️ Erro ao carregar perfil, usando dados básicos');
-        // Em caso de erro, ainda tentar definir um usuário básico
-        const basicUser: User = {
-          id: supabaseUser.id,
-          nome: supabaseUser.user_metadata?.nome || supabaseUser.email?.split('@')[0] || 'Usuário',
-          email: supabaseUser.email || '',
-          cargo: supabaseUser.user_metadata?.cargo || 'Usuário',
-          avatar: supabaseUser.user_metadata?.avatar_url || undefined
-        };
-        setUser(basicUser);
-        localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
+        console.log('✅ Perfil completo carregado');
       }
     } catch (error: any) {
-      console.log('ℹ️ Erro ao carregar perfil, usando dados básicos');
-      // Em caso de erro, ainda tentar definir um usuário básico
-      const basicUser: User = {
-        id: supabaseUser.id,
-        nome: supabaseUser.user_metadata?.nome || supabaseUser.email?.split('@')[0] || 'Usuário',
-        email: supabaseUser.email || '',
-        cargo: supabaseUser.user_metadata?.cargo || 'Usuário',
-        avatar: supabaseUser.user_metadata?.avatar_url || undefined
-      };
-      setUser(basicUser);
-      localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
+      // Silenciosamente ignora erro - já temos dados básicos funcionando
+      console.log('ℹ️ Usando dados básicos (perfil completo não disponível)');
     }
   };
 
