@@ -578,7 +578,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
   return (
     <div className="flex flex-col h-full bg-gray-900">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 shadow-lg">
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-4 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
