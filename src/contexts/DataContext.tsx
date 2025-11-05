@@ -168,23 +168,49 @@ export function DataProvider({ children }: DataProviderProps) {
       return;
     }
     
+    // Tentar carregar do cache primeiro para feedback instantâneo
+    const cachedData = localStorage.getItem(`maiacred_data_${user.id}`);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        setClientes(parsed.clientes || []);
+        setBancos(parsed.bancos || []);
+        setContratos(parsed.contratos || []);
+        setMetaAnual(parsed.metaAnual || 180000);
+        console.log('✅ Dados carregados do cache');
+      } catch (e) {
+        console.warn('Erro ao carregar cache:', e);
+      }
+    }
+    
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('Iniciando carregamento de dados...');
-      // Carregar clientes e bancos primeiro para ter a lista completa
-      await Promise.all([
+      console.log('🔄 Atualizando dados do servidor...');
+      const startTime = performance.now();
+      
+      // Carregar TUDO em paralelo para máxima velocidade
+      const [clientesResult, bancosResult, contratosResult, metaResult] = await Promise.all([
         loadClientes(),
-        loadBancos()
+        loadBancos(),
+        loadContratos(),
+        loadMetaAnual()
       ]);
       
-      // Depois carregar contratos e atualizar métricas
-      await loadContratos();
+      const endTime = performance.now();
+      console.log(`✅ Dados atualizados em ${(endTime - startTime).toFixed(0)}ms`);
       
-      // Por fim carregar configurações
-      await loadMetaAnual();
-      console.log('Dados carregados com sucesso!');
+      // Salvar no cache para próxima vez
+      const dataToCache = {
+        clientes: clientesResult,
+        bancos: bancosResult,
+        contratos: contratosResult,
+        metaAnual: metaResult,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`maiacred_data_${user.id}`, JSON.stringify(dataToCache));
+      
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setError('Erro ao carregar dados');
@@ -198,7 +224,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .eq('user_id', user?.id) // Adicionar filtro por user_id
+        .eq('user_id', user?.id)
         .order('nome');
 
       if (error) throw error;
@@ -212,15 +238,15 @@ export function DataProvider({ children }: DataProviderProps) {
         endereco: cliente.endereco,
         dataNascimento: cliente.data_nascimento,
         observacoes: cliente.observacoes,
-        status: 'inativo', // Será atualizado automaticamente pelo updateMetrics
-        contratos: 0 // Será calculado depois
+        status: 'inativo',
+        contratos: 0
       }));
 
-      console.log('Clientes carregados:', clientesFormatted);
       setClientes(clientesFormatted);
+      return clientesFormatted;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      throw error;
+      return [];
     }
   };
 
@@ -247,11 +273,11 @@ export function DataProvider({ children }: DataProviderProps) {
         volumeTotal: 'R$ 0' // Será calculado depois
       }));
 
-      console.log('Bancos carregados:', bancosFormatted);
       setBancos(bancosFormatted);
+      return bancosFormatted;
     } catch (error) {
       console.error('Erro ao carregar bancos:', error);
-      throw error;
+      return [];
     }
   };
 
@@ -331,12 +357,12 @@ export function DataProvider({ children }: DataProviderProps) {
         };
       });
 
-      console.log('Contratos carregados:', contratosFormatted);
       setContratos(contratosFormatted);
       updateMetrics(contratosFormatted);
+      return contratosFormatted;
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
-      throw error;
+      return [];
     }
   };
 
@@ -353,16 +379,20 @@ export function DataProvider({ children }: DataProviderProps) {
       }
 
       if (data) {
-        console.log('Meta anual carregada:', data.meta_anual);
         setMetaAnual(data.meta_anual);
+        return data.meta_anual;
+      } else {
+        return 180000;
       }
     } catch (error) {
       console.error('Erro ao carregar meta anual:', error);
+      return 180000;
     }
   };
 
   const updateMetrics = (contratos: Contrato[]) => {
     console.log('Atualizando métricas com contratos:', contratos);
+    
     // Atualizar métricas dos clientes apenas se houver mudança
     setClientes(prev => {
       const updatedClientes = prev.map(cliente => {
