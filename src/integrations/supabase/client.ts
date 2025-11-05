@@ -76,62 +76,7 @@ if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
       }
     });
     
-    // Teste básico de conectividade com timeout melhorado
-    const testConnectivity = async () => {
-      try {
-        const timeout = setTimeout(() => {
-          throw new Error('Timeout na conexão com Supabase');
-        }, 10000); // Aumentado de 8s para 10s
-        
-        let attempt = 0;
-        const maxAttempts = 3;
-        let success = false;
-        
-        while (attempt < maxAttempts && !success) {
-          try {
-            await supabaseClient.auth.getSession();
-            clearTimeout(timeout);
-            success = true;
-            console.log('✓ Supabase configurado e conectado com sucesso');
-          } catch (error) {
-            attempt++;
-            console.warn(`Tentativa de conexão ${attempt} falhou:`, error);
-            if (attempt < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-            } else {
-              clearTimeout(timeout);
-              throw error;
-            }
-          }
-        }
-      } catch (error: any) {
-        console.error('❌ ERRO CRÍTICO - Supabase:', error.message);
-        
-        if (error.message?.includes('disabled')) {
-          console.error('🚨 SOLUÇÃO URGENTE: Autenticação por email está DESABILITADA no Supabase');
-          console.error('📋 PASSOS:');
-          console.error('   1. Acesse: https://supabase.com/dashboard');
-          console.error('   2. Projeto: emvnudlonqoyfptrdwtd');
-          console.error('   3. Authentication → Settings');
-          console.error('   4. HABILITE: "Enable email provider"');
-          console.error('   5. DESABILITE: "Confirm email" (para desenvolvimento)');
-          console.error('   6. Site URL: http://localhost:8080');
-        } else if (error.message?.includes('Timeout')) {
-          console.warn('⚠️ Problema de conectividade com Supabase - PC pode ter conexão mais lenta');
-          console.warn('💡 Sugestões:');
-          console.warn('   1. Verifique sua conexão com a internet');
-          console.warn('   2. Tente recarregar a página (Ctrl+F5)');
-          console.warn('   3. Use uma rede com melhor conectividade');
-          console.warn('   4. Aplicação funcionará em modo offline se necessário');
-        }
-      }
-    };
-    
-    setTimeout(() => {
-      testConnectivity().catch(console.error);
-    }, 100);
-    
-    console.log('✓ Supabase cliente configurado');
+    console.log('✓ Supabase cliente configurado e pronto');
   } catch (error) {
     console.error('Erro ao configurar/conectar Supabase:', error);
     console.warn('⚠️ Usando modo offline devido a problemas de conectividade');
