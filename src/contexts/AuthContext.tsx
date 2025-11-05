@@ -55,7 +55,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
   };
-
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
       console.log('Carregando perfil do usuário:', supabaseUser.id);
@@ -63,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Tentar carregar perfil da tabela profiles
       const result = await withTimeout(
         supabase.from('profiles').select('*').eq('id', supabaseUser.id).single(),
-        5000, // 5 segundos para carregar perfil da tabela
+        15000, // 15 segundos para carregar perfil da tabela
         'Timeout ao carregar perfil do usuário.'
       );
       const { data: profile, error: profileError } = result as any;
@@ -76,12 +75,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           cargo: profile.cargo,
           avatar: profile.avatar_url || undefined
         };
-        console.log('✅ Perfil completo carregado:', completeUserData);
         setUser(completeUserData);
         localStorage.setItem('maiacred_user', JSON.stringify(completeUserData));
       } else {
-        console.warn('⚠️ Perfil da tabela não disponível, usando dados básicos:', profileError);
-        // Fallback para usuário básico se o perfil não for encontrado
+        console.log('ℹ️ Erro ao carregar perfil, usando dados básicos');
+        // Em caso de erro, ainda tentar definir um usuário básico
         const basicUser: User = {
           id: supabaseUser.id,
           nome: supabaseUser.user_metadata?.nome || supabaseUser.email?.split('@')[0] || 'Usuário',
@@ -93,8 +91,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem('maiacred_user', JSON.stringify(basicUser));
       }
     } catch (error: any) {
-      console.error('❌ Erro ao carregar perfil:', error.message);
-      setError(error.message);
+      console.log('ℹ️ Erro ao carregar perfil, usando dados básicos');
       // Em caso de erro, ainda tentar definir um usuário básico
       const basicUser: User = {
         id: supabaseUser.id,
@@ -111,14 +108,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let isMounted = true;
     
-    // Timeout de segurança: se após 8 segundos ainda estiver carregando, forçar parada
+    // Timeout de segurança aumentado para 20 segundos
     const safetyTimeout = setTimeout(() => {
       if (isMounted && isLoading) {
-        console.warn('⚠️ Timeout de segurança ativado - forçando fim do loading');
+        console.log('ℹ️ Timeout de segurança ativado');
         setIsLoading(false);
-        setError('Timeout ao verificar autenticação. Tente recarregar a página.');
       }
-    }, 8000);
+    }, 20000);
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
