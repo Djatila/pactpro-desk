@@ -112,7 +112,7 @@ const databaseTools = [
 
 // Componentes auxiliares
 const UserIcon = () => (
-  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+  <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
     </svg>
@@ -120,7 +120,7 @@ const UserIcon = () => (
 );
 
 const BotIcon = () => (
-  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 shadow-lg">
+  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center flex-shrink-0 shadow-lg">
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
       <circle cx="9" cy="14" r="1"/>
@@ -145,7 +145,7 @@ interface MessageBubbleProps {
 const MessageBubble = ({ message, isStreaming }: MessageBubbleProps) => {
   const isUser = message.role === Role.USER;
   const bubbleClasses = isUser
-    ? 'bg-blue-600 self-end rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
+    ? 'bg-emerald-600 self-end rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
     : 'bg-gray-700 self-start rounded-tr-2xl rounded-tl-2xl rounded-br-2xl';
 
   const showLoading = message.role === Role.MODEL && isStreaming && message.text.length === 0;
@@ -610,7 +610,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         {/* Indicador de histórico restaurado */}
         {messages.length > 1 && !showSuggestions && (
           <div className="text-center mb-4">
-            <div className="inline-flex items-center gap-2 bg-blue-900/30 text-blue-300 px-3 py-1 rounded-full text-xs">
+            <div className="inline-flex items-center gap-2 bg-emerald-900/30 text-emerald-300 px-3 py-1 rounded-full text-xs">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
@@ -653,12 +653,12 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Digite sua mensagem..."
             disabled={isLoading || !chat}
-            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-sm"
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 text-sm"
           />
           <button
             type="submit"
             disabled={isLoading || !chat || !inputValue.trim()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
           >
             {isLoading ? '...' : 'Enviar'}
           </button>
