@@ -174,7 +174,7 @@ export function ChatInterface({ apiKey }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<any>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [error, setError] = useState<string | null>(null); // Adicionado setError
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 

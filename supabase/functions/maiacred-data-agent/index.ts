@@ -45,6 +45,40 @@ async function getUserIdFromAuth(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
+// Função auxiliar para calcular parcelas pagas e restantes
+function calculateParcelas(contrato: any) {
+  try {
+    const [day, month, year] = contrato.data_emprestimo.split('/');
+    const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const hoje = new Date();
+
+    // Calcular meses passados
+    const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
+    const diffMonths = hoje.getMonth() - dataInicio.getMonth();
+    const totalMonthsPassed = diffYears * 12 + diffMonths;
+
+    const parcelasPagas = Math.max(0, Math.min(contrato.parcelas, totalMonthsPassed));
+    const parcelasRestantes = contrato.parcelas - parcelasPagas;
+    
+    return { parcelasPagas, parcelasRestantes };
+  } catch (e) {
+    console.warn('Erro ao calcular parcelas para contrato:', contrato.id, e);
+    return { parcelasPagas: 0, parcelasRestantes: contrato.parcelas };
+  }
+}
+
+// Função para formatar contratos com dados calculados
+function formatContratos(contratos: any[]) {
+  return contratos.map(c => {
+    const { parcelasPagas, parcelasRestantes } = calculateParcelas(c);
+    return {
+      ...c,
+      parcelasPagas,
+      parcelasRestantes,
+    };
+  });
+}
+
 // Função principal para consultar o banco de dados (query simples)
 async function queryDatabase(userId: string, tableName: string, filters: Record<string, any> = {}) {
   console.log(`DEBUG: Consultando tabela: ${tableName} para user: ${userId}`);
@@ -82,8 +116,13 @@ async function queryDatabase(userId: string, tableName: string, filters: Record<
     return { error: error.message };
   }
   
-  console.log(`DEBUG: Consulta bem-sucedida para ${tableName}. Resultados: ${data?.length}`);
-  return { data };
+  let formattedData = data;
+  if (tableName === 'contratos') {
+    formattedData = formatContratos(data);
+  }
+  
+  console.log(`DEBUG: Consulta bem-sucedida para ${tableName}. Resultados: ${formattedData?.length}`);
+  return { data: formattedData };
 }
 
 // Função para obter estatísticas de contratos
@@ -92,22 +131,26 @@ async function getContratosStats(userId: string) {
   
   const { data, error } = await supabaseAdmin
     .from('contratos')
-    .select('status, valor_total, taxa, parcelas')
+    .select('status, valor_total, taxa, parcelas, data_emprestimo')
     .eq('user_id', userId);
 
   if (error) {
     console.error('DEBUG: Erro ao obter estatísticas:', error);
     return { error: error.message };
   }
+  
+  const contratosFormatados = formatContratos(data);
 
   const stats = {
-    total: data.length,
-    ativos: data.filter(c => c.status === 'ativo').length,
-    pendentes: data.filter(c => c.status === 'pendente').length,
-    finalizados: data.filter(c => c.status === 'finalizado').length,
-    valorTotal: data.reduce((sum, c) => sum + c.valor_total, 0),
-    receitaTotal: data.reduce((sum, c) => sum + (c.valor_total * c.taxa / 100), 0),
-    totalParcelas: data.reduce((sum, c) => sum + c.parcelas, 0),
+    total: contratosFormatados.length,
+    ativos: contratosFormatados.filter(c => c.status === 'ativo').length,
+    pendentes: contratosFormatados.filter(c => c.status === 'pendente').length,
+    finalizados: contratosFormatados.filter(c => c.status === 'finalizado').length,
+    valorTotal: contratosFormatados.reduce((sum, c) => sum + c.valor_total, 0),
+    receitaTotal: contratosFormatados.reduce((sum, c) => sum + (c.valor_total * c.taxa / 100), 0),
+    totalParcelas: contratosFormatados.reduce((sum, c) => sum + c.parcelas, 0),
+    totalParcelasPagas: contratosFormatados.reduce((sum, c) => sum + c.parcelasPagas, 0),
+    totalParcelasRestantes: contratosFormatados.reduce((sum, c) => sum + c.parcelasRestantes, 0),
   };
 
   console.log('DEBUG: Estatísticas calculadas:', stats);
@@ -190,23 +233,11 @@ async function getContratosVencendo(userId: string, meses: number = 3) {
   }
 
   // Calcular contratos próximos do vencimento
-  const hoje = new Date();
-  const contratosVencendo = contratos.filter(c => {
-    try {
-      const [day, month, year] = c.data_emprestimo.split('/');
-      const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      
-      // Calcular meses passados
-      const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
-      const diffMonths = hoje.getMonth() - dataInicio.getMonth();
-      const totalMonthsPassed = diffYears * 12 + diffMonths;
-      
-      const mesesRestantes = c.parcelas - totalMonthsPassed;
-      
-      return mesesRestantes > 0 && mesesRestantes <= meses;
-    } catch (e) {
-      return false;
-    }
+  const contratosFormatados = formatContratos(contratos);
+  
+  const contratosVencendo = contratosFormatados.filter(c => {
+    // Usar parcelas restantes calculadas
+    return c.parcelasRestantes > 0 && c.parcelasRestantes <= meses;
   });
 
   console.log(`DEBUG: Contratos vencendo: ${contratosVencendo.length}`);
@@ -349,8 +380,10 @@ async function getContratosPorCliente(userId: string, clienteNome: string) {
       return { error: `Nenhum contrato encontrado para o cliente "${clienteNome}"` };
     }
     
-    console.log(`DEBUG: ${contratos.length} contrato(s) encontrado(s)`);
-    return { data: contratos };
+    const contratosFormatados = formatContratos(contratos);
+    
+    console.log(`DEBUG: ${contratosFormatados.length} contrato(s) encontrado(s)`);
+    return { data: contratosFormatados };
   } catch (error) {
     console.error('DEBUG: Erro ao obter contratos por cliente:', error);
     return { error: error.message };
