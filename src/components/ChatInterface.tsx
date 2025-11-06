@@ -447,13 +447,16 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
 
     setShowSuggestions(false); // Esconder sugestões após primeira mensagem
     const userMessage: ChatMessage = { role: Role.USER, text: messageText };
-    setMessages(prev => [...prev, userMessage]);
+    
+    // Adicionar a mensagem do usuário e o placeholder do modelo em uma única atualização
+    setMessages(prev => [...prev, userMessage, { role: Role.MODEL, text: '' }]);
+    
     setInputValue('');
     setIsLoading(true);
     setError(null);
 
-    const currentMessageIndex = messages.length + 1;
-    setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
+    // O índice da mensagem do modelo é o último elemento do array
+    const modelMessageIndex = messages.length + 1;
 
     try {
       
@@ -494,8 +497,8 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         // 1. Atualizar a mensagem com a chamada da ferramenta
         setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
-            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto para o streaming
+            newMessages[modelMessageIndex].toolCalls = response.functionCalls;
+            newMessages[modelMessageIndex].text = ''; // Limpar texto para o streaming
             return newMessages;
         });
 
@@ -527,8 +530,8 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         // 2. Atualizar a mensagem com o resultado da ferramenta
         setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].toolResponse = toolResult;
-            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto novamente antes do streaming
+            newMessages[modelMessageIndex].toolResponse = toolResult;
+            newMessages[modelMessageIndex].text = ''; // Limpar texto novamente antes do streaming
             return newMessages;
         });
 
@@ -568,7 +571,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         // Atualizar mensagem com o texto final
         setMessages(prev => {
           const newMessages = [...prev];
-          newMessages[currentMessageIndex - 1].text = newText;
+          newMessages[modelMessageIndex].text = newText;
           return newMessages;
         });
         
@@ -588,14 +591,14 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
           // Exibir o texto da resposta
           setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].text = text;
+            newMessages[modelMessageIndex].text = text;
             return newMessages;
           });
         } else {
           console.warn('⚠️ Resposta vazia do Gemini!');
           setMessages(prev => {
             const newMessages = [...prev];
-            newMessages[currentMessageIndex - 1].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
+            newMessages[modelMessageIndex].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
             return newMessages;
           });
         }
