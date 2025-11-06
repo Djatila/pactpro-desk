@@ -174,6 +174,7 @@ export function ChatInterface({ apiKey }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<any>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [error, setError] = useState<string | null>(null); // Adicionado setError
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -447,14 +448,12 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
-    setError(null);
+    setError(null); // Limpar erro aqui
 
     const currentMessageIndex = messages.length + 1;
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
 
     try {
-      // Removida a lógica de override manual para bancos inativos.
-      // O Gemini agora deve usar a System Instruction para gerar a chamada de função correta.
       
       console.log('🤖 Chamando Gemini...');
       const result = await chat.sendMessage(userMessage.text);
