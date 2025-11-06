@@ -42,41 +42,8 @@ export function NotificationCenter() {
           // Formatar data de vencimento
           const dataVencimento = dataTermino.toLocaleDateString('pt-BR');
           
-          // Gerar notificações para 6, 5, 4, 3, 2 e 1 mês(es) antes do vencimento
-          if (diffDays <= 180 && diffDays > 150) { // 6 meses
-            notifications.push({
-              id: `${contrato.id}-6m`,
-              type: 'info',
-              title: 'Contrato distante do vencimento',
-              message: `${formatContratoNome(contratos, contrato)} vence em ${Math.ceil(diffDays / 30)} meses`,
-              contratoId: contrato.id,
-              clienteNome: contrato.clienteNome,
-              diasRestantes: diffDays,
-              dataVencimento
-            });
-          } else if (diffDays <= 150 && diffDays > 120) { // 5 meses
-            notifications.push({
-              id: `${contrato.id}-5m`,
-              type: 'info',
-              title: 'Contrato a 5 meses do vencimento',
-              message: `${formatContratoNome(contratos, contrato)} vence em ${Math.ceil(diffDays / 30)} meses`,
-              contratoId: contrato.id,
-              clienteNome: contrato.clienteNome,
-              diasRestantes: diffDays,
-              dataVencimento
-            });
-          } else if (diffDays <= 120 && diffDays > 90) { // 4 meses
-            notifications.push({
-              id: `${contrato.id}-4m`,
-              type: 'info',
-              title: 'Contrato a 4 meses do vencimento',
-              message: `${formatContratoNome(contratos, contrato)} vence em ${Math.ceil(diffDays / 30)} meses`,
-              contratoId: contrato.id,
-              clienteNome: contrato.clienteNome,
-              diasRestantes: diffDays,
-              dataVencimento
-            });
-          } else if (diffDays <= 90 && diffDays > 60) { // 3 meses
+          // Gerar notificações para 3, 2 e 1 mês(es) antes do vencimento
+          if (diffDays <= 90 && diffDays > 60) { // 3 meses
             notifications.push({
               id: `${contrato.id}-3m`,
               type: 'info',
@@ -111,6 +78,7 @@ export function NotificationCenter() {
             });
           }
         } catch (error) {
+          // Ignorar contratos com data inválida
           console.error('Erro ao processar contrato:', contrato.id, error);
         }
       }
@@ -121,7 +89,6 @@ export function NotificationCenter() {
 
   const notifications = getNotifications();
   const hasNotifications = notifications.length > 0;
-  const totalNotifications = notifications.length;
 
   const getIcon = (type: 'warning' | 'info') => {
     switch (type) {
@@ -159,7 +126,7 @@ export function NotificationCenter() {
               variant="destructive" 
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
             >
-              {totalNotifications}
+              {notifications.length}
             </Badge>
           )}
         </Button>
@@ -171,7 +138,7 @@ export function NotificationCenter() {
             <h3 className="font-semibold text-sm">Notificações de Contratos</h3>
             {hasNotifications && (
               <Badge variant="outline" className="text-xs">
-                {totalNotifications} {totalNotifications === 1 ? 'notificação' : 'notificações'}
+                {notifications.length} {notifications.length === 1 ? 'notificação' : 'notificações'}
               </Badge>
             )}
           </div>
@@ -201,20 +168,25 @@ export function NotificationCenter() {
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-start justify-between">
-                      <p className="text-sm font-medium leading-none">
+                      <p className="text-sm font-medium">
                         {notification.clienteNome}
                       </p>
-                      <span className="text-xs text-muted-foreground">
-                        {notification.dataVencimento}
-                      </span>
+                      <Badge 
+                        variant={notification.type === 'warning' ? 'destructive' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {formatMensagem(notification)}
+                      </Badge>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {notification.title}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {notification.message}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className={notification.type === 'warning' ? 'text-yellow-600' : 'text-blue-600'}>
-                        {formatMensagem(notification)}
-                      </span>
+                      <Calendar className="h-3 w-3" />
+                      <span>Vencimento: {notification.dataVencimento}</span>
                     </div>
                   </div>
                 </div>

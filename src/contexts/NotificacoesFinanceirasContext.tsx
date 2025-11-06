@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { NotificacoesFinanceirasService, NotificacaoFinanceira } from '@/services/notificacoesFinanceiras';
+import { supabase } from '@/lib/supabase';
 
 interface NotificacoesFinanceirasContextType {
   notificacoes: NotificacaoFinanceira[];
   notificacoesNaoLidas: NotificacaoFinanceira[];
-  notificacoesInstitucionais: NotificacaoFinanceira[];
-  notificacoesMercado: NotificacaoFinanceira[];
   totalNaoLidas: number;
   marcarComoLida: (id: string) => void;
   marcarTodasComoLidas: () => void;
@@ -28,7 +27,10 @@ interface NotificacoesFinanceirasProviderProps {
 
 export function NotificacoesFinanceirasProvider({ children }: NotificacoesFinanceirasProviderProps) {
   const [notificacoes, setNotificacoes] = useState<NotificacaoFinanceira[]>([]);
-  const service = NotificacoesFinanceirasService.getInstance();
+  const service = useMemo(
+    () => NotificacoesFinanceirasService.getInstance(supabase),
+    [supabase]
+  );
 
   // Atualizar estado com notificações do service
   const atualizarNotificacoes = () => {
@@ -41,41 +43,46 @@ export function NotificacoesFinanceirasProvider({ children }: NotificacoesFinanc
     // Carregar notificações iniciais
     atualizarNotificacoes();
 
-    // Configurar atualização a cada 30 segundos para sincronizar com o service
+    // Configurar atualização a cada 2 horas para sincronizar com o service
     const interval = setInterval(() => {
       atualizarNotificacoes();
-    }, 30 * 1000);
+    }, 2 * 60 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Calcular notificações derivadas
-  const notificacoesNaoLidas = notificacoes.filter(n => !n.lida);
-  const notificacoesInstitucionais = notificacoes.filter(n => n.categoria === 'institucional');
-  const notificacoesMercado = notificacoes.filter(n => n.categoria === 'mercado');
+  // Filtrar notificações não lidas
+  const notificacoesNaoLidas = useMemo(() => 
+    notificacoes.filter(n => !n.lida),
+    [notificacoes]
+  );
+  
   const totalNaoLidas = notificacoesNaoLidas.length;
 
+  // Marcar notificação como lida
   const marcarComoLida = (id: string) => {
     service.marcarComoLida(id);
-    atualizarNotificacoes();
+    setNotificacoes(prev => 
+      prev.map(n => n.id === id ? { ...n, lida: true } : n)
+    );
   };
 
+  // Marcar todas as notificações como lidas
   const marcarTodasComoLidas = () => {
     service.marcarTodasComoLidas();
-    atualizarNotificacoes();
+    setNotificacoes(prev => 
+      prev.map(n => ({ ...n, lida: true }))
+    );
   };
 
   const value: NotificacoesFinanceirasContextType = {
     notificacoes,
     notificacoesNaoLidas,
-    notificacoesInstitucionais,
-    notificacoesMercado,
     totalNaoLidas,
     marcarComoLida,
     marcarTodasComoLidas,
     atualizarNotificacoes
   };
-
   return (
     <NotificacoesFinanceirasContext.Provider value={value}>
       {children}

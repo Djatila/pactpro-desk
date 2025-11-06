@@ -403,120 +403,182 @@ async function getDashboardSummary(userId: string) {
 }
 
 serve(async (req) => {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const responseHeaders = {
+    ...corsHeaders,
+    ...(authHeader ? { Authorization: authHeader } : {}),
+  };
+
   // Lidar com requisições OPTIONS (CORS preflight)
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: responseHeaders });
   }
 
   try {
+    const body = await req.json();
+    const {
+      operation = 'query',
+      tableName,
+      filters,
+      query,
+      limit,
+      meses,
+      clienteNome,
+    } = body as {
+      operation?: string;
+      tableName?: string;
+      filters?: Record<string, any>;
+      query?: string;
+      limit?: number;
+      meses?: number;
+      clienteNome?: string;
+    };
+
     const userId = await getUserIdFromAuth(req);
-    
-    if (!userId) {
-      console.error("DEBUG: Requisição não autorizada - userId nulo.");
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing token' }), {
+    const isPublicBancosQuery = (operation === 'query' && tableName === 'bancos');
+
+    if (!userId && !isPublicBancosQuery) {
+      console.error('DEBUG: Requisição não autorizada - userId nulo.');
+      return new Response(JSON.stringify({
+        error: 'Unauthorized: Invalid or missing token',
+      }), {
         status: 401,
-        headers: corsHeaders,
+        headers: responseHeaders,
       });
     }
 
-    const body = await req.json();
-    const { operation = 'query', tableName, filters, query, limit, meses } = body;
+    const authenticatedUserId = userId ?? '';
 
-    console.log(`DEBUG: Operação solicitada: ${operation}`);
+    let result:
+      | { data: any; error?: undefined }
+      | { error: string; data?: undefined }
+      | { data?: any; error?: string };
 
-    let result;
-
-    // Roteamento baseado na operação
     switch (operation as OperationType) {
-      case 'query':
+      case 'query': {
         if (!tableName) {
-          return new Response(JSON.stringify({ error: 'Missing tableName parameter for query operation' }), {
+          return new Response(JSON.stringify({
+            error: 'Missing tableName parameter for query operation',
+          }), {
             status: 400,
-            headers: corsHeaders,
+            headers: responseHeaders,
           });
         }
-        
-        // Lista de tabelas permitidas
-        const allowedTables = ['clientes', 'bancos', 'contratos', 'configuracoes', 'tipos_contrato', 'profiles'];
+
+        const allowedTables = [
+          'clientes',
+          'bancos',
+          'contratos',
+          'configuracoes',
+          'tipos_contrato',
+          'profiles',
+        ];
+
         if (!allowedTables.includes(tableName)) {
-          return new Response(JSON.stringify({ error: 'Access denied to this table' }), {
+          return new Response(JSON.stringify({
+            error: 'Access denied to this table',
+          }), {
             status: 403,
-            headers: corsHeaders,
+            headers: responseHeaders,
           });
         }
-        
-        result = await queryDatabase(userId, tableName, filters);
+
+        if (!userId && isPublicBancosQuery) {
+          let publicQuery = supabaseAdmin
+            .from('bancos')
+            .select('*');
+
+          Object.entries(filters ?? {}).forEach(([key, value]) => {
+            publicQuery = publicQuery.eq(key, value as any);
+          });
+
+          const { data, error } = await publicQuery.limit(100);
+          result = error ? { error: error.message } : { data };
+        } else {
+          result = await queryDatabase(authenticatedUserId, tableName, filters ?? {});
+        }
         break;
+      }
 
       case 'stats':
-        result = await getContratosStats(userId);
+        result = await getContratosStats(authenticatedUserId);
         break;
 
       case 'topBancos':
-        result = await getTopBancos(userId, limit || 5);
+        result = await getTopBancos(authenticatedUserId, limit ?? 5);
         break;
 
-      case 'search':
+      case 'search': {
         if (!query) {
-          return new Response(JSON.stringify({ error: 'Missing query parameter for search operation' }), {
+          return new Response(JSON.stringify({
+            error: 'Missing query parameter for search operation',
+          }), {
             status: 400,
-            headers: corsHeaders,
+            headers: responseHeaders,
           });
         }
-        result = await searchCliente(userId, query);
+        result = await searchCliente(authenticatedUserId, query);
         break;
+      }
 
       case 'contratosVencendo':
-        result = await getContratosVencendo(userId, meses || 3);
+        result = await getContratosVencendo(authenticatedUserId, meses ?? 3);
         break;
 
       case 'aggregate':
-        result = await getMetaProgress(userId);
+        result = await getMetaProgress(authenticatedUserId);
         break;
 
       case 'dashboardSummary':
-        result = await getDashboardSummary(userId);
+        result = await getDashboardSummary(authenticatedUserId);
         break;
 
       case 'clientesAtivos':
-        result = await getClientesAtivos(userId);
+        result = await getClientesAtivos(authenticatedUserId);
         break;
 
-      case 'contratosPorCliente':
-        const { clienteNome } = body;
+      case 'contratosPorCliente': {
         if (!clienteNome) {
-          return new Response(JSON.stringify({ error: 'Missing clienteNome parameter' }), {
+          return new Response(JSON.stringify({
+            error: 'Missing clienteNome parameter',
+          }), {
             status: 400,
-            headers: corsHeaders,
+            headers: responseHeaders,
           });
         }
-        result = await getContratosPorCliente(userId, clienteNome);
+        result = await getContratosPorCliente(authenticatedUserId, clienteNome);
         break;
+      }
 
       default:
-        return new Response(JSON.stringify({ error: `Unknown operation: ${operation}` }), {
+        return new Response(JSON.stringify({
+          error: `Unknown operation: ${operation}`,
+        }), {
           status: 400,
-          headers: corsHeaders,
+          headers: responseHeaders,
         });
     }
 
-    if (result.error) {
-      return new Response(JSON.stringify({ error: result.error }), {
+    if (result?.error) {
+      return new Response(JSON.stringify({
+        error: result.error,
+      }), {
         status: 500,
-        headers: corsHeaders,
+        headers: responseHeaders,
       });
     }
 
-    return new Response(JSON.stringify(result.data), {
+    return new Response(JSON.stringify(result?.data ?? null), {
       status: 200,
-      headers: corsHeaders,
+      headers: responseHeaders,
     });
-
   } catch (error) {
-    console.error("Erro geral na Edge Function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Erro geral na Edge Function:', error);
+    return new Response(JSON.stringify({
+      error: (error as Error).message,
+    }), {
       status: 500,
-      headers: corsHeaders,
+      headers: responseHeaders,
     });
   }
 });

@@ -1,65 +1,40 @@
-// Tipos de dados das APIs externas
-export interface SelicData {
-  valor: number;
-  data: string;
-}
-
-export interface CdiData {
-  valor: number;
-  data: string;
-}
-
-export interface IpcaData {
-  valor: number;
-  mes: string;
-  ano: string;
-}
-
-export interface CambioData {
-  valor: number;
-  data: string;
-}
-
-export interface NoticiaFinanceira {
-  titulo: string;
-  fonte: string;
-  data: string;
-  url?: string;
-}
-
-// Tipos de notificação financeira
+// Tipos de dados para notificações
 export interface NotificacaoFinanceira {
   id: string;
-  tipo: 'SELIC' | 'CDI' | 'IPCA' | 'CAMBIO' | 'POUPANCA' | 'IGPM' | 'PIB' | 'DESEMPREGO' | 'NOTICIA';
-  categoria: 'institucional' | 'mercado';
+  tipo: 'CONTRATO';
   titulo: string;
-  fonte: string;
+  descricao: string;
   dataHora: string;
   lida: boolean;
-  valor?: number;
-  unidade?: string;
-  url?: string;
-  variacao?: number; // Para mostrar se subiu/desceu
+  contratoId?: string;
+  clienteId?: string;
+  dataVencimento?: string;
+  diasRestantes?: number;
 }
 
-// Serviços para buscar dados das APIs externas
+// Serviço de notificações
 export class NotificacoesFinanceirasService {
   private static instance: NotificacoesFinanceirasService;
   private notificacoes: NotificacaoFinanceira[] = [];
+  private supabase: any;
 
-  static getInstance(): NotificacoesFinanceirasService {
+  static getInstance(supabase?: any): NotificacoesFinanceirasService {
     if (!this.instance) {
-      this.instance = new NotificacoesFinanceirasService();
+      this.instance = new NotificacoesFinanceirasService(supabase);
+    } else if (supabase) {
+      this.instance.setSupabase(supabase);
     }
     return this.instance;
   }
 
-  private constructor() {
-    // Carregar notificações do localStorage
+  private constructor(supabase?: any) {
+    this.supabase = supabase;
     this.carregarNotificacoes();
-    
-    // Iniciar busca periódica
     this.iniciarBuscaPeriodica();
+  }
+
+  public setSupabase(supabase: any) {
+    this.supabase = supabase;
   }
 
   private carregarNotificacoes() {
@@ -81,227 +56,74 @@ export class NotificacoesFinanceirasService {
     }
   }
 
-  private async buscarSelic(): Promise<SelicData | null> {
-    try {
-      // Simular dados da API do BACEN SGS
-      // URL real seria: https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json
-      console.log('🔄 Simulando busca da SELIC...');
-      
-      // Dados simulados
-      const selicAtual = {
-        valor: 10.50,
-        data: new Date().toISOString().split('T')[0]
-      };
-      
-      return selicAtual;
-    } catch (error) {
-      console.error('Erro ao buscar SELIC:', error);
-      return null;
-    }
-  }
-
-  private async buscarCDI(): Promise<CdiData | null> {
-    try {
-      console.log('🔄 Simulando busca do CDI...');
-      
-      // Dados simulados
-      const cdiAtual = {
-        valor: 10.25,
-        data: new Date().toISOString().split('T')[0]
-      };
-      
-      return cdiAtual;
-    } catch (error) {
-      console.error('Erro ao buscar CDI:', error);
-      return null;
-    }
-  }
-
-  private async buscarIPCA(): Promise<IpcaData | null> {
-    try {
-      console.log('🔄 Simulando busca do IPCA...');
-      
-      // Dados simulados
-      const hoje = new Date();
-      const ipcaAtual = {
-        valor: 4.87,
-        mes: (hoje.getMonth() + 1).toString().padStart(2, '0'),
-        ano: hoje.getFullYear().toString()
-      };
-      
-      return ipcaAtual;
-    } catch (error) {
-      console.error('Erro ao buscar IPCA:', error);
-      return null;
-    }
-  }
-
-  private async buscarCambio(): Promise<CambioData | null> {
-    try {
-      console.log('🔄 Simulando busca do câmbio USD/BRL...');
-      
-      // Dados simulados
-      const cambioAtual = {
-        valor: 5.45,
-        data: new Date().toISOString().split('T')[0]
-      };
-      
-      return cambioAtual;
-    } catch (error) {
-      console.error('Erro ao buscar câmbio:', error);
-      return null;
-    }
-  }
-
-  private async buscarPoupanca(): Promise<PoupancaData | null> {
-    try {
-      console.log('🔄 Simulando busca da Poupança...');
-      
-      // Simular dados da API do BACEN
-      const poupancaAtual = {
-        valor: 0.6234, // Taxa mensal
-        data: new Date().toISOString().split('T')[0]
-      };
-      
-      return poupancaAtual;
-    } catch (error) {
-      console.error('Erro ao buscar Poupança:', error);
-      return null;
-    }
-  }
-
-  private async buscarIGPM(): Promise<IGPMData | null> {
-    try {
-      console.log('🔄 Simulando busca do IGP-M...');
-      
-      const igpmAtual = {
-        valor: 0.45, // Variação mensal
-        mes: new Date().toLocaleDateString('pt-BR', { month: 'long' }),
-        ano: new Date().getFullYear().toString()
-      };
-      
-      return igpmAtual;
-    } catch (error) {
-      console.error('Erro ao buscar IGP-M:', error);
-      return null;
-    }
-  }
-
-  private async buscarPIB(): Promise<PIBData | null> {
-    try {
-      console.log('🔄 Simulando busca do PIB...');
-      
-      const pibAtual = {
-        valor: 2.1, // Crescimento trimestral
-        trimestre: '3º trimestre',
-        ano: new Date().getFullYear().toString()
-      };
-      
-      return pibAtual;
-    } catch (error) {
-      console.error('Erro ao buscar PIB:', error);
-      return null;
-    }
-  }
-
-  private async buscarDesemprego(): Promise<DesempregoData | null> {
-    try {
-      console.log('🔄 Simulando busca da Taxa de Desemprego...');
-      
-      const desempregoAtual = {
-        valor: 7.8, // Taxa de desemprego
-        mes: new Date().toLocaleDateString('pt-BR', { month: 'long' }),
-        ano: new Date().getFullYear().toString()
-      };
-      
-      return desempregoAtual;
-    } catch (error) {
-      console.error('Erro ao buscar Taxa de Desemprego:', error);
-      return null;
-    }
-  }
-
-  private async buscarNoticiasFinanceiras(): Promise<NoticiaFinanceira[]> {
-    try {
-      console.log('🔄 Simulando busca de notícias financeiras...');
-      
-      // Notícias mais realistas e variadas
-      const noticiasPool = [
-        {
-          titulo: 'Dólar fecha em alta de 0,8% cotado a R$ 5,45',
-          fonte: 'InfoMoney',
-          data: new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'Banco Central mantém Selic em 10,75% ao ano',
-          fonte: 'Valor Econômico',
-          data: new Date(Date.now() - Math.random() * 4 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'IPCA acumula alta de 4,2% em 12 meses',
-          fonte: 'G1 Economia',
-          data: new Date(Date.now() - Math.random() * 6 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'Ibovespa sobe 1,2% e fecha acima dos 125 mil pontos',
-          fonte: 'UOL Economia',
-          data: new Date(Date.now() - Math.random() * 3 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'PIB brasileiro cresce 0,9% no terceiro trimestre',
-          fonte: 'CNN Brasil',
-          data: new Date(Date.now() - Math.random() * 5 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'Taxa de desemprego cai para 7,8% no trimestre',
-          fonte: 'Folha de S.Paulo',
-          data: new Date(Date.now() - Math.random() * 7 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'Petróleo Brent sobe 2,1% com tensões geopolíticas',
-          fonte: 'Reuters Brasil',
-          data: new Date(Date.now() - Math.random() * 1 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          titulo: 'Bitcoin ultrapassa US$ 95.000 em nova máxima histórica',
-          fonte: 'CoinTelegraph',
-          data: new Date(Date.now() - Math.random() * 8 * 60 * 60 * 1000).toISOString()
-        }
-      ];
-      
-      // Retornar 2-4 notícias aleatórias
-      const numNoticias = Math.floor(Math.random() * 3) + 2;
-      const noticiasEscolhidas = noticiasPool
-        .sort(() => Math.random() - 0.5)
-        .slice(0, numNoticias);
-      
-      return noticiasEscolhidas;
-    } catch (error) {
-      console.error('Erro ao buscar notícias:', error);
+  private async buscarContratosProximosVencimento() {
+    if (!this.supabase) {
+      console.warn('Supabase não está configurado para buscar contratos');
       return [];
     }
+
+    try {
+      // Buscar contratos com vencimento nos próximos 6 meses
+      const hoje = new Date();
+      const seisMesesAFrente = new Date();
+      seisMesesAFrente.setMonth(hoje.getMonth() + 6);
+
+      // Formatar datas para o formato YYYY-MM-DD
+      const formatarData = (data: Date) => data.toISOString().split('T')[0];
+
+      const { data: contratos, error } = await this.supabase
+        .from('contratos')
+        .select('id, cliente_id, primeiro_vencimento, clientes(nome)')
+        .gte('primeiro_vencimento', formatarData(hoje))
+        .lte('primeiro_vencimento', formatarData(seisMesesAFrente))
+        .order('primeiro_vencimento', { ascending: true });
+
+      if (error) throw error;
+
+      // Processar contratos para criar notificações
+      const notificacoes = (contratos || []).map(contrato => {
+        const dataVencimento = new Date(contrato.primeiro_vencimento);
+        const diffTime = dataVencimento.getTime() - hoje.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return this.criarNotificacao(
+          'CONTRATO',
+          `Contrato próximo do vencimento`,
+          `O contrato do cliente ${contrato.clientes?.nome || 'Cliente'} vence em ${diffDays} dia${diffDays > 1 ? 's' : ''}`,
+          contrato.id,
+          contrato.cliente_id,
+          contrato.primeiro_vencimento,
+          diffDays
+        );
+      });
+
+      return notificacoes;
+    } catch (error) {
+      console.error('Erro ao buscar contratos próximos do vencimento:', error);
+    }
   }
 
+
   private criarNotificacao(
-    tipo: NotificacaoFinanceira['tipo'],
-    categoria: NotificacaoFinanceira['categoria'],
+    tipo: 'CONTRATO',
     titulo: string,
-    fonte: string,
-    valor?: number,
-    unidade?: string,
-    url?: string
+    descricao: string,
+    contratoId: string,
+    clienteId: string,
+    dataVencimento: string,
+    diasRestantes: number
   ): NotificacaoFinanceira {
     return {
-      id: `${tipo}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${tipo}-${contratoId}-${Date.now()}`,
       tipo,
-      categoria,
       titulo,
-      fonte,
+      descricao,
       dataHora: new Date().toISOString(),
       lida: false,
-      valor,
-      unidade,
-      url
+      contratoId,
+      clienteId,
+      dataVencimento,
+      diasRestantes
     };
   }
 
@@ -327,150 +149,24 @@ export class NotificacoesFinanceirasService {
   }
 
   public async buscarTodasNotificacoes() {
-    console.log('📡 Iniciando busca de notificações financeiras...');
+    console.log('🔍 Buscando contratos próximos do vencimento...');
 
     try {
-      // Buscar todos os dados institucionais e do IBGE
-      const [selic, cdi, ipca, cambio, poupanca, igpm, pib, desemprego] = await Promise.all([
-        this.buscarSelic(),
-        this.buscarCDI(),
-        this.buscarIPCA(),
-        this.buscarCambio(),
-        this.buscarPoupanca(),
-        this.buscarIGPM(),
-        this.buscarPIB(),
-        this.buscarDesemprego()
-      ]);
-
-      // Processar SELIC
-      if (selic) {
-        const variacao = (Math.random() - 0.5) * 0.5; // Variação aleatória
-        const notificacao = this.criarNotificacao(
-          'SELIC',
-          'institucional',
-          `Taxa Selic ${variacao >= 0 ? 'sobe' : 'cai'} para ${selic.valor.toFixed(2)}%`,
-          'BACEN',
-          selic.valor,
-          '%'
-        );
-        notificacao.variacao = variacao;
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar CDI
-      if (cdi) {
-        const variacao = (Math.random() - 0.5) * 0.3;
-        const notificacao = this.criarNotificacao(
-          'CDI',
-          'institucional',
-          `CDI registra ${variacao >= 0 ? 'alta' : 'queda'} de ${Math.abs(variacao).toFixed(2)}%`,
-          'CETIP',
-          cdi.valor,
-          '%'
-        );
-        notificacao.variacao = variacao;
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar IPCA
-      if (ipca) {
-        const notificacao = this.criarNotificacao(
-          'IPCA',
-          'institucional',
-          `IPCA acumula ${ipca.valor.toFixed(2)}% em 12 meses`,
-          'IBGE',
-          ipca.valor,
-          '%'
-        );
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar Câmbio (Dólar)
-      if (cambio) {
-        const variacao = (Math.random() - 0.5) * 0.1;
-        const notificacao = this.criarNotificacao(
-          'CAMBIO',
-          'mercado',
-          `Dólar ${variacao >= 0 ? 'sobe' : 'cai'} ${Math.abs(variacao * 100).toFixed(1)}% e fecha a R$ ${cambio.valor.toFixed(2)}`,
-          'BACEN',
-          cambio.valor,
-          'BRL'
-        );
-        notificacao.variacao = variacao;
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar Poupança
-      if (poupanca) {
-        const notificacao = this.criarNotificacao(
-          'POUPANCA',
-          'institucional',
-          `Poupança rende ${poupanca.valor.toFixed(4)}% no mês`,
-          'BACEN',
-          poupanca.valor,
-          '%'
-        );
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar IGP-M
-      if (igpm) {
-        const notificacao = this.criarNotificacao(
-          'IGPM',
-          'institucional',
-          `IGP-M registra ${igpm.valor >= 0 ? 'alta' : 'deflação'} de ${Math.abs(igpm.valor).toFixed(2)}% em ${igpm.mes}`,
-          'FGV',
-          igpm.valor,
-          '%'
-        );
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar PIB
-      if (pib) {
-        const notificacao = this.criarNotificacao(
-          'PIB',
-          'institucional',
-          `PIB brasileiro ${pib.valor >= 0 ? 'cresce' : 'recua'} ${Math.abs(pib.valor).toFixed(1)}% no ${pib.trimestre}`,
-          'IBGE',
-          pib.valor,
-          '%'
-        );
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Processar Taxa de Desemprego
-      if (desemprego) {
-        const notificacao = this.criarNotificacao(
-          'DESEMPREGO',
-          'institucional',
-          `Taxa de desemprego ${Math.random() > 0.5 ? 'cai' : 'sobe'} para ${desemprego.valor}% em ${desemprego.mes}`,
-          'IBGE',
-          desemprego.valor,
-          '%'
-        );
-        this.adicionarNotificacao(notificacao);
-      }
-
-      // Buscar notícias do mercado
-      const noticias = await this.buscarNoticiasFinanceiras();
-      noticias.forEach(noticia => {
-        const notificacao = this.criarNotificacao(
-          'NOTICIA',
-          'mercado',
-          noticia.titulo,
-          noticia.fonte,
-          undefined,
-          undefined,
-          noticia.url
-        );
+      // Limpar notificações antigas de contratos
+      this.notificacoes = this.notificacoes.filter(n => n.tipo !== 'CONTRATO');
+      
+      // Buscar contratos próximos do vencimento
+      const notificacoesContratos = await this.buscarContratosProximosVencimento();
+      
+      // Adicionar novas notificações
+      notificacoesContratos.forEach(notificacao => {
         this.adicionarNotificacao(notificacao);
       });
 
-      console.log(`📊 Processamento concluído. Total de notificações: ${this.notificacoes.length}`);
-
+      console.log(`✅ ${notificacoesContratos.length} contrato(s) próximo(s) do vencimento encontrado(s)`);
+      
     } catch (error) {
-      console.error('Erro durante busca de notificações:', error);
+      console.error('Erro durante busca de contratos:', error);
     }
   }
 
@@ -478,12 +174,12 @@ export class NotificacoesFinanceirasService {
     // Buscar imediatamente
     this.buscarTodasNotificacoes();
 
-    // Configurar busca a cada 1 minuto (conforme solicitado)
+    // Configurar busca a cada 2 horas (não precisa verificar com tanta frequência)
     setInterval(() => {
       this.buscarTodasNotificacoes();
-    }, 60 * 1000); // 60 segundos
+    }, 2 * 60 * 60 * 1000); // 2 horas
 
-    console.log('⏰ Busca periódica de notificações iniciada (a cada 1 minuto)');
+    console.log('⏰ Busca periódica de contratos próximos ao vencimento iniciada');
   }
 
   public getNotificacoes(): NotificacaoFinanceira[] {
@@ -507,7 +203,7 @@ export class NotificacoesFinanceirasService {
     this.salvarNotificacoes();
   }
 
-  public getNotificacoesPorCategoria(categoria: 'institucional' | 'mercado'): NotificacaoFinanceira[] {
-    return this.notificacoes.filter(n => n.categoria === categoria);
+  public getNotificacoesPorTipo(tipo: 'CONTRATO'): NotificacaoFinanceira[] {
+    return this.notificacoes.filter(n => n.tipo === tipo);
   }
 }

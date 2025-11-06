@@ -154,7 +154,7 @@ const MessageBubble = ({ message, isStreaming }) => {
 
 // --- Main Chat Interface Component ---
 
-export default function ChatInterface() {
+export default function ChatInterface({ apiKey: apiKeyProp }) {
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([
     { role: Role.MODEL, text: "Olá! Eu sou o MaiaCred AI, seu assistente de dados. Posso consultar informações sobre seus clientes, contratos e bancos. Como posso ajudar hoje?" }
@@ -169,22 +169,24 @@ export default function ChatInterface() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const apiKey = urlParams.get('apiKey');
+    const apiKeyFromUrl = urlParams.get('apiKey');
     const token = urlParams.get('supabaseToken'); // Lendo o token da URL
     
     setSupabaseToken(token);
 
-    console.log('DEBUG CHATBOT: API Key (primeiros 10 chars):', apiKey ? apiKey.substring(0, 10) : 'NULO');
+    const resolvedApiKey = apiKeyProp || apiKeyFromUrl;
+
+    console.log('DEBUG CHATBOT: API Key (primeiros 10 chars):', resolvedApiKey ? resolvedApiKey.substring(0, 10) : 'NULO');
     console.log('DEBUG CHATBOT: Supabase Token (primeiros 10 chars):', token ? token.substring(0, 10) : 'NULO');
 
-    if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey === 'KEY_NOT_CONFIGURED' || apiKey.startsWith('AIzaSyDip_')) {
+    if (!resolvedApiKey || resolvedApiKey === 'null' || resolvedApiKey === 'undefined' || resolvedApiKey === 'KEY_NOT_CONFIGURED' || resolvedApiKey.startsWith('AIzaSyDip_')) {
         setError('Chave da API do Gemini não configurada ou inválida. Por favor, defina VITE_GEMINI_API_KEY no seu arquivo .env.');
         setIsLoading(false);
         return;
     }
     
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const genAI = new GoogleGenerativeAI(resolvedApiKey);
       
       // Todas as 6 ferramentas disponíveis
       const allTools = [{
@@ -212,6 +214,8 @@ Você tem acesso a 7 ferramentas para consultar dados:
 - Escolha a ferramenta mais adequada para cada pergunta.
 - Para listar clientes: use queryDatabase com tableName="clientes"
 - Para listar bancos: use queryDatabase com tableName="bancos"
+- Para listar bancos com status específico (ex.: ativos ou inativos): use queryDatabase com tableName="bancos" e filters={ status: "<status>" }
+- Se não houver resultados, informe ao usuário que nenhum banco foi encontrado com aquele status em vez de dizer que a funcionalidade não existe.
 - Para estatísticas de contratos: use getContratosStats
 
 **FORMATAÇÃO DE RESPOSTAS:**
@@ -234,7 +238,11 @@ Resposta: "Aqui estão os bancos com mais contratos:
 
 🏦 **Santander** (Código 033)
    • 1 contrato
-   • Volume total: R$ 6.517,77"`,
+   • Volume total: R$ 6.517,77
+
+Pergunta: "Quais bancos inativos?"
+Resposta: "Vou consultar os bancos inativos para você."
+→ Chame queryDatabase com { tableName: "bancos", filters: { status: "inativo" } }"`,
       });
       
       const chatSession = model.startChat({
@@ -246,7 +254,7 @@ Resposta: "Aqui estão os bancos com mais contratos:
       console.error(e);
       setError('Falha ao inicializar o modelo de chat. Verifique sua chave API.');
     }
-  }, []);
+  }, [apiKeyProp]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -322,10 +330,6 @@ Resposta: "Aqui estão os bancos com mais contratos:
       console.warn('⚠️ Já está carregando');
       return;
     }
-    if (!chat) {
-      console.error('❌ Chat não inicializado');
-      return;
-    }
 
     const userMessage = { role: Role.USER, text: input };
     console.log('📤 Enviando mensagem:', userMessage.text);
@@ -335,6 +339,63 @@ Resposta: "Aqui estão os bancos com mais contratos:
     setInput('');
     setIsLoading(true);
     setError(null);
+    
+    // Verificar intenções específicas antes de chamar o Gemini
+    const inputLower = input.toLowerCase();
+    const isInativosQuery = inputLower.includes('banco') && (inputLower.includes('inativo') || inputLower.includes('desativado') || inputLower.includes('inativos') || inputLower.includes('desativados'));
+    
+    if (isInativosQuery) {
+      console.log('🔍 Detectado pedido de bancos inativos:', input);
+      const toolCall = {
+        name: 'queryDatabase',
+        args: {
+          tableName: "bancos",
+          filters: { status: "inativo" }
+        }
+      };
+      
+      try {
+        console.log('📡 Chamando edge function para bancos inativos');
+        const toolResult = await callSupabaseEdgeFunction({ ...toolCall.args, operation: 'query' });
+        
+        console.log('📊 Resultado da consulta:', toolResult);
+        
+        if (toolResult.error) {
+          setMessages(prev => [...prev, {
+            role: Role.MODEL,
+            text: `Erro ao buscar bancos inativos: ${toolResult.error}`
+          }]);
+        } else if (!toolResult.data || toolResult.data.length === 0) {
+          setMessages(prev => [...prev, {
+            role: Role.MODEL,
+            text: "Nenhum banco inativo encontrado no sistema."
+          }]);
+        } else {
+          const responseText = toolResult.data.map(banco => 
+            `🏦 ${banco.nome || 'Nome não informado'} (Código ${banco.codigo || 'N/A'}) - Status: ${banco.status}`
+          ).join('\n');
+          
+          setMessages(prev => [...prev, {
+            role: Role.MODEL,
+            text: `Bancos inativos encontrados:\n${responseText}`
+          }]);
+        }
+      } catch (e) {
+        console.error('❌ Erro no fallback:', e);
+        setMessages(prev => [...prev, {
+          role: Role.MODEL,
+          text: `Erro ao processar consulta: ${e.message}`
+        }]);
+      }
+      
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!chat) {
+      console.error('❌ Chat não inicializado');
+      return;
+    }
     
     // Adicionar um placeholder para a resposta do modelo
     let currentMessageIndex = messages.length + 1;
