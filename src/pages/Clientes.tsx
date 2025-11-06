@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,13 @@ export default function Clientes() {
   const [editingCliente, setEditingCliente] = useState<any>(null);
   const [viewingCliente, setViewingCliente] = useState<any>(null);
   const [deletingCliente, setDeletingCliente] = useState<any>(null);
-  const { clientes, addCliente, updateCliente, deleteCliente } = useData();
+  const { clientes, addCliente, updateCliente, deleteCliente, refreshData } = useData();
+
+  // Forçar refresh dos dados do servidor ao montar a página
+  useEffect(() => {
+    console.log('🔄 Clientes montado. Forçando refresh dos dados do servidor...');
+    refreshData();
+  }, [refreshData]);
 
   const handleCreateCliente = async (data: ClienteFormData) => {
     try {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,14 @@ export default function Bancos() {
   const [deletingBanco, setDeletingBanco] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const { bancos, contratos, addBanco, updateBanco, deleteBanco } = useData();
+  const { bancos, contratos, addBanco, updateBanco, deleteBanco, refreshData } = useData();
   const navigate = useNavigate();
+
+  // Forçar refresh dos dados do servidor ao montar a página
+  useEffect(() => {
+    console.log('🔄 Bancos montado. Forçando refresh dos dados do servidor...');
+    refreshData();
+  }, [refreshData]);
 
   const handleCreateBanco = async (data: BancoFormData) => {
     try {

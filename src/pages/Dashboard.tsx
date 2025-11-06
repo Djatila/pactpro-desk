@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/StatsCard";
 import { ContratosChart } from "@/components/charts/ContratosChart";
@@ -28,8 +28,14 @@ export default function Dashboard() {
   const [isContratoModalOpen, setIsContratoModalOpen] = useState(false);
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
   const [isBancoModalOpen, setIsBancoModalOpen] = useState(false);
-  const { clientes, contratos, addContrato, addCliente, addBanco, isLoading: isDataLoading } = useData();
+  const { clientes, contratos, addContrato, addCliente, addBanco, isLoading: isDataLoading, refreshData } = useData();
   const navigate = useNavigate();
+
+  // Forçar refresh dos dados do servidor ao montar a página
+  useEffect(() => {
+    console.log('🔄 Dashboard montado. Forçando refresh dos dados do servidor...');
+    refreshData();
+  }, [refreshData]);
 
   // Obter clientes mais recentes (ordenados por ID que representa ordem de cadastro)
   const clientesRecentes = [...clientes]

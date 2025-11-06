@@ -40,9 +40,15 @@ export default function Contratos() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isTipoManagerModalOpen, setIsTipoManagerModal] = useState(false);
   const [searchParams] = useSearchParams();
-  const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf, loadTiposContrato } = useData();
+  const { contratos, bancos, addContrato, updateContrato, deleteContrato, downloadContratoPdf, loadTiposContrato, refreshData } = useData();
   // Estado para os tipos de contrato
   const [tiposContrato, setTiposContrato] = useState<{value: string, label: string}[]>([]);
+
+  // Forçar refresh dos dados do servidor ao montar a página
+  useEffect(() => {
+    console.log('🔄 Contratos montado. Forçando refresh dos dados do servidor...');
+    refreshData();
+  }, [refreshData]);
 
   // Carregar tipos de contrato quando o componente montar
   useEffect(() => {

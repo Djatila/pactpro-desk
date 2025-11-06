@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,13 @@ export default function Relatorios() {
   const [filtroBanco, setFiltroBanco] = useState("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
-  const { contratos, bancos, clientes, metaAnual, updateMetaAnual } = useData();
+  const { contratos, bancos, clientes, metaAnual, updateMetaAnual, refreshData } = useData();
+
+  // Forçar refresh dos dados do servidor ao montar a página
+  useEffect(() => {
+    console.log('🔄 Relatórios montado. Forçando refresh dos dados do servidor...');
+    refreshData();
+  }, [refreshData]);
 
   // Funções para as ações
   const handleGerarRelatorio = () => {
@@ -307,7 +313,9 @@ export default function Relatorios() {
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Progresso</p>
+                  <p className={`text-sm text-muted-foreground mb-1 ${
+                    progressoMeta >= 100 ? 'text-success' : progressoMeta > 0 ? 'text-warning' : 'text-muted-foreground'
+                  }`}>Progresso</p>
                   <p className={`text-xl font-bold ${
                     progressoMeta >= 100 ? 'text-success' : progressoMeta > 0 ? 'text-warning' : 'text-muted-foreground'
                   }`}>
