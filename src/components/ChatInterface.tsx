@@ -301,21 +301,21 @@ REGRAS DE CONSULTA DE BANCOS:
 - Para listar bancos inativos, use queryDatabase com tableName="bancos" e filters: { status: "inativo" }
 
 **REGRAS DE FORMATAÇÃO CRÍTICAS:**
-- **Listas:** Sempre use listas formatadas com Markdown (`- ` ou `* ` ou `1. `) e **quebras de linha** (`\n`) entre os itens para garantir a legibilidade.
+- **Listas:** Sempre use listas formatadas com Markdown (`- ` ou `* ` ou `1. `) e **quebras de linha** (`\\n`) entre os itens para garantir a legibilidade.
 - **Dados Agregados:** Use negrito (`**`) para valores importantes (ex: "Sua receita total é de **R$ 10.000,00**").
-- **Quebras de Linha:** Use quebras de linha duplas (`\n\n`) para separar parágrafos e tópicos.
+- **Quebras de Linha:** Use quebras de linha duplas (`\\n\\n`) para separar parágrafos e tópicos.
 - **Emojis:** Use emojis relevantes (ex: 👥, 🏦, 📄) para categorizar a informação.
 
 EXEMPLOS OBRIGATÓRIOS DE COMO RESPONDER:
 
 Pergunta: "Quais clientes estão inativos?"
-✅ CORRETO: [Chamar queryDatabase] [Chamar getClientesAtivos] [Comparar IDs] "Você tem **3 clientes cadastrados**. Destes, **1 é ativo** e **2 são inativos**. Os clientes inativos são:\n\n- Maria Silva\n- João Santos"
+✅ CORRETO: [Chamar queryDatabase] [Chamar getClientesAtivos] [Comparar IDs] "Você tem **3 clientes cadastrados**. Destes, **1 é ativo** e **2 são inativos**. Os clientes inativos são:\\n\\n- Maria Silva\\n- João Santos"
 
 Pergunta: "Quantos contratos tenho?"
-✅ CORRETO: [Chamar getContratosStats] "Você tem **120 contratos** no total:\n\n- **80** ativos\n- **25** pendentes\n- **15** finalizados"
+✅ CORRETO: [Chamar getContratosStats] "Você tem **120 contratos** no total:\\n\\n- **80** ativos\\n- **25** pendentes\\n- **15** finalizados"
 
 Pergunta: "Mostre os contratos do João"
-✅ CORRETO: [Chamar getContratosPorCliente] "Encontrei **3 contratos** do João:\n\n1. Contrato 12345 - Banco Santander - Valor: R$ 5.000,00\n2. Contrato 67890 - Banco do Brasil - Valor: R$ 10.000,00"
+✅ CORRETO: [Chamar getContratosPorCliente] "Encontrei **3 contratos** do João:\\n\\n1. Contrato 12345 - Banco Santander - Valor: R$ 5.000,00\\n2. Contrato 67890 - Banco do Brasil - Valor: R$ 10.000,00"
 
 PERSONALIDADE:
 - Amigável e prestativa
@@ -371,7 +371,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         if (messages.length === 0) {
           setMessages([{
             role: Role.MODEL,
-            text: `Olá, ${userName}! 👋\n\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\n\n💡 Algumas coisas que posso fazer:\n• Diferenciar entre clientes cadastrados e clientes ativos\n• Mostrar estatísticas de contratos\n• Buscar informações de clientes\n• Listar os principais bancos\n• Verificar contratos próximos do vencimento\n• Acompanhar o progresso da meta\n\n📌 Dica importante:\n• "Clientes cadastrados" = todos os clientes no sistema\n• "Clientes ativos" = apenas clientes com contratos ativos\n\nComo posso ajudar você hoje?`
+            text: `Olá, ${userName}! 👋\\n\\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\\n\\n💡 Algumas coisas que posso fazer:\\n• Diferenciar entre clientes cadastrados e clientes ativos\\n• Mostrar estatísticas de contratos\\n• Buscar informações de clientes\\n• Listar os principais bancos\\n• Verificar contratos próximos do vencimento\\n• Acompanhar o progresso da meta\\n\\n📌 Dica importante:\\n• "Clientes cadastrados" = todos os clientes no sistema\\n• "Clientes ativos" = apenas clientes com contratos ativos\\n\\nComo posso ajudar você hoje?`
           }]);
         } else {
           console.log('✅ Chat restaurado com', messages.length, 'mensagens anteriores');
@@ -629,7 +629,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
       localStorage.removeItem(getStorageKey());
       setMessages([{
         role: Role.MODEL,
-        text: `Olá, ${userName}! 👋\n\nHistórico limpo! Sou a MaiaCred, sua assistente virtual.\n\nComo posso ajudar você hoje?`
+        text: `Olá, ${userName}! 👋\\n\\nHistórico limpo! Sou a MaiaCred, sua assistente virtual.\\n\\nComo posso ajudar você hoje?`
       }]);
       setShowSuggestions(true);
       console.log('🗑️ Histórico de conversas limpo');
