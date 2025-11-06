@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
   
   // Configurar chaves primária e secundária do Gemini
   const primaryKey = env.VITE_GEMINI_API_KEY_PRIMARY || env.VITE_GEMINI_API_KEY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho";
-  const secondaryKey = env.VITE_GEMINI_API_KEY_SECONDARY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho_FALLBACK"; // Fallback genérico
+  // Usando a chave fornecida como fallback secundário
+  const secondaryKey = env.VITE_GEMINI_API_KEY_SECONDARY || "AIzaSyDip_VjC1J3BZE3qgiOIanHEW6DNV1FdI4"; 
   
   define['import.meta.env.VITE_GEMINI_API_KEY_PRIMARY'] = JSON.stringify(primaryKey);
   define['import.meta.env.VITE_GEMINI_API_KEY_SECONDARY'] = JSON.stringify(secondaryKey);
