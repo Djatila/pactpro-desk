@@ -290,6 +290,10 @@ DIFERENÇA CRÍTICA - CLIENTES:
 SEMPRE esclareça a diferença quando relevante. Exemplo:
 "Você tem 150 clientes cadastrados no total. Destes, 85 são clientes ativos (com contratos ativos) e 65 são clientes inativos (sem contratos ativos no momento)."
 
+REGRAS DE CONSULTA DE BANCOS:
+- Para listar bancos ativos, use queryDatabase com tableName="bancos" e filters: { status: "ativo" }
+- Para listar bancos inativos, use queryDatabase com tableName="bancos" e filters: { status: "inativo" }
+
 EXEMPLOS OBRIGATÓRIOS DE COMO RESPONDER:
 
 Pergunta: "Quais clientes estão inativos?"
@@ -443,35 +447,60 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setError(null);
 
     const currentMessageIndex = messages.length + 1;
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
 
     try {
-      const result = await chat.sendMessage(messageText);
+      // Removida a lógica de override manual para bancos inativos.
+      // O Gemini agora deve usar a System Instruction para gerar a chamada de função correta.
+      
+      console.log('🤖 Chamando Gemini...');
+      const result = await chat.sendMessage(userMessage.text);
       const response = result.response;
-
+      
+      console.log('✅ Resposta do Gemini recebida:', response);
+      
+      // Tentar obter texto e function calls com tratamento de erro
       let text = '';
       let functionCalls = null;
-
+      
       try {
         text = response.text();
       } catch (textError) {
-        console.warn('⚠️ Erro ao obter texto:', textError);
+        console.warn('⚠️ Erro ao obter texto da resposta:', textError);
+        text = '';
       }
-
+      
       try {
         functionCalls = response.functionCalls();
       } catch (fcError) {
         console.warn('⚠️ Erro ao obter function calls:', fcError);
+        functionCalls = null;
       }
-
-      // Loop de function calling
+      
+      console.log('📝 Text:', text);
+      console.log('🔧 FunctionCalls:', functionCalls);
+      
+      // Loop para lidar com Tool Calling
       while (functionCalls && functionCalls.length > 0) {
+        console.log('🔧 Function calls detectados:', functionCalls);
         const toolCall = functionCalls[0];
         const toolName = toolCall.name;
         const toolArgs = toolCall.args;
 
+        // 1. Atualizar a mensagem com a chamada da ferramenta
+        setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].toolCalls = response.functionCalls;
+            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto para o streaming
+            return newMessages;
+        });
+
+        let toolResult;
+        
+        // Mapear nome da ferramenta para operação da Edge Function
         const toolOperationMap: Record<string, string> = {
           'queryDatabase': 'query',
           'getClientesAtivos': 'clientesAtivos',
@@ -483,78 +512,115 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
           'getMetaProgress': 'aggregate',
           'getDashboardSummary': 'dashboardSummary',
         };
-
+        
         const operation = toolOperationMap[toolName];
         
-        console.log('🔧 Tool:', toolName, '| Operation:', operation, '| Args:', toolArgs);
+        if (operation) {
+          // Adicionar operation aos argumentos se não existir
+          const edgeFunctionArgs = { ...toolArgs, operation };
+          toolResult = await callSupabaseEdgeFunction(edgeFunctionArgs);
+        } else {
+          toolResult = { error: `Ferramenta desconhecida: ${toolName}` };
+        }
         
-        const toolResult = operation
-          ? await callSupabaseEdgeFunction({ ...toolArgs, operation })
-          : { error: `Ferramenta desconhecida: ${toolName}` };
-        
-        console.log('📊 Result:', toolResult);
+        // 2. Atualizar a mensagem com o resultado da ferramenta
+        setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].toolResponse = toolResult;
+            newMessages[currentMessageIndex - 1].text = ''; // Limpar texto novamente antes do streaming
+            return newMessages;
+        });
 
+        // 3. Enviar o resultado da ferramenta de volta para o Gemini
         const result = await chat.sendMessage([{
           functionResponse: {
             name: toolName,
-            response: { content: toolResult },
+            response: {
+              content: toolResult,
+            },
           },
         }]);
-
+        
         const newResponse = result.response;
+        
+        // Tentar obter texto e function calls com tratamento de erro
         let newText = '';
         let newFunctionCalls = null;
-
+        
         try {
           newText = newResponse.text();
-        } catch (e) {
-          console.warn('⚠️ Erro ao obter novo texto:', e);
+        } catch (textError) {
+          console.warn('⚠️ Erro ao obter texto da nova resposta:', textError);
+          newText = '';
         }
-
+        
         try {
           newFunctionCalls = newResponse.functionCalls();
-        } catch (e) {
-          console.warn('⚠️ Erro ao obter novos function calls:', e);
+        } catch (fcError) {
+          console.warn('⚠️ Erro ao obter novos function calls:', fcError);
+          newFunctionCalls = null;
         }
-
+        
+        console.log('📝 Nova resposta após tool:', newText);
+        console.log('🔧 Novos function calls:', newFunctionCalls);
+        
+        // Atualizar mensagem com o texto final
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[currentMessageIndex - 1].text = newText;
           return newMessages;
         });
-
-        if (!newFunctionCalls || newFunctionCalls.length === 0) break;
+        
+        // Se não há mais function calls, terminar o loop
+        if (!newFunctionCalls || newFunctionCalls.length === 0) {
+          console.log('✅ Loop de function calls finalizado');
+          break;
+        }
+        
+        // Atualizar para próxima iteração
         functionCalls = newFunctionCalls;
       }
-
-      // Se não houve function calls
+      
+      // Se não houve function calls e não há texto, exibir o texto ou mensagem de erro
       if (!functionCalls || functionCalls.length === 0) {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[currentMessageIndex - 1].text = text || 'Desculpe, não consegui gerar uma resposta.';
-          return newMessages;
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Erro ao enviar mensagem:', error);
-      
-      let errorMessage = `Erro: ${error.message}`;
-      
-      // Tratamento especial para erro de quota
-      if (error.message?.includes('quota') || error.message?.includes('429')) {
-        const retryMatch = error.message.match(/retry in (\d+)/i);
-        const retrySeconds = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
-        
-        errorMessage = `⚠️ Limite de requisições atingido!\n\n` +
-          `A API do Gemini tem um limite de uso gratuito. Por favor, aguarde ${retrySeconds} segundos e tente novamente.\n\n` +
-          `💡 Dica: Para uso ilimitado, considere fazer upgrade para o plano pago do Gemini API.`;
+        if (text) {
+          // Exibir o texto da resposta
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].text = text;
+            return newMessages;
+          });
+        } else {
+          console.warn('⚠️ Resposta vazia do Gemini!');
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[currentMessageIndex - 1].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
+            return newMessages;
+          });
+        }
       }
       
-      setMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[currentMessageIndex - 1].text = errorMessage;
-        return newMessages;
-      });
+    } catch (e) {
+      console.error("ERRO CRÍTICO NO CHATBOT:", e);
+      
+      let errorMessage = 'Ocorreu um erro desconhecido.';
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      }
+      
+      // Tentar extrair a mensagem de erro da API se for um objeto JSON
+      try {
+        const apiErrorMatch = errorMessage.match(/\{"error":\{"code":\d+,"message":"([^"]+)","status":"[^"]+"\}\}/);
+        if (apiErrorMatch && apiErrorMatch[1]) {
+          errorMessage = `Erro da API: ${apiErrorMatch[1]}`;
+        }
+      } catch (parseError) {
+        // Ignorar erro de parse se a mensagem não for JSON
+      }
+      
+      setError(`Erro: ${errorMessage}`);
+      setMessages(prev => prev.slice(0, -1)); // Remove the placeholder
+      setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro. ${errorMessage}` }]);
     } finally {
       setIsLoading(false);
     }
