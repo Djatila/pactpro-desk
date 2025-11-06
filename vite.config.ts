@@ -21,10 +21,10 @@ export default defineConfig(({ mode }) => {
   }
   
   // Injetar a chave Gemini fornecida pelo usuário
-  const geminiApiKey = env.VITE_GEMINI_API_KEY || "AIzaSyB2UNiDPJYfi2YTKdrVHUOc8Zm7sU5lNks";
+  const geminiApiKey = env.VITE_GEMINI_API_KEY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho";
   define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify(geminiApiKey);
   
-  if (geminiApiKey === "AIzaSyB2UNiDPJYfi2YTKdrVHUOc8Zm7sU5lNks") {
+  if (geminiApiKey === "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho") {
     console.warn('⚠️ Usando chave Gemini hardcoded. Recomenda-se definir VITE_GEMINI_API_KEY no .env.local.');
   }
   
