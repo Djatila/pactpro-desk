@@ -107,7 +107,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }, 20000);
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Removendo 'async' do callback e usando .finally() para gerenciar isLoading
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
       console.log('🔄 Evento de autenticação Supabase:', event);
@@ -115,13 +116,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (session) {
         console.log('✅ Sessão ativa detectada. Carregando perfil...');
-        await loadUserProfile(session.user);
+        // Chama a função e usa .finally para garantir que isLoading seja false
+        loadUserProfile(session.user).finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        });
       } else {
         console.log('ℹ️ Nenhuma sessão ativa. Limpando usuário...');
         setUser(null);
         localStorage.removeItem('maiacred_user');
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     });
 
     // Tentar carregar do localStorage na montagem inicial para evitar flash
