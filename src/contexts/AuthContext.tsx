@@ -107,8 +107,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }, 20000);
     
-    // Removendo 'async' do callback e usando .finally() para gerenciar isLoading
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Usar uma função wrapper para garantir que o retorno seja sempre undefined
+    const authStateChangeHandler = (event: string, session: any) => {
       if (!isMounted) return;
 
       console.log('🔄 Evento de autenticação Supabase:', event);
@@ -130,7 +130,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setIsLoading(false);
         }
       }
-    });
+      // Retorno explícito de undefined para evitar que o navegador interprete como resposta assíncrona
+      return undefined; 
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(authStateChangeHandler);
 
     // Tentar carregar do localStorage na montagem inicial para evitar flash
     const storedUser = localStorage.getItem('maiacred_user');
