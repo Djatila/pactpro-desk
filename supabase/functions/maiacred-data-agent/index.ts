@@ -71,10 +71,18 @@ function calculateParcelas(contrato: any) {
 function formatContratos(contratos: any[]) {
   return contratos.map(c => {
     const { parcelasPagas, parcelasRestantes } = calculateParcelas(c);
+    
+    // Calcular receita agente
+    const receitaAgente = c.valor_total * (c.taxa / 100);
+    
     return {
       ...c,
       parcelasPagas,
       parcelasRestantes,
+      receitaAgente,
+      // Adicionar nome do cliente e banco no nível superior para facilitar o processamento do Gemini
+      clienteNome: c.clientes?.nome || 'Cliente Desconhecido',
+      bancoNome: c.bancos?.nome || 'Banco Desconhecido',
     };
   });
 }
@@ -147,7 +155,7 @@ async function getContratosStats(userId: string) {
     pendentes: contratosFormatados.filter(c => c.status === 'pendente').length,
     finalizados: contratosFormatados.filter(c => c.status === 'finalizado').length,
     valorTotal: contratosFormatados.reduce((sum, c) => sum + c.valor_total, 0),
-    receitaTotal: contratosFormatados.reduce((sum, c) => sum + (c.valor_total * c.taxa / 100), 0),
+    receitaTotal: contratosFormatados.reduce((sum, c) => sum + c.receitaAgente, 0),
     totalParcelas: contratosFormatados.reduce((sum, c) => sum + c.parcelas, 0),
     totalParcelasPagas: contratosFormatados.reduce((sum, c) => sum + c.parcelasPagas, 0),
     totalParcelasRestantes: contratosFormatados.reduce((sum, c) => sum + c.parcelasRestantes, 0),
@@ -319,7 +327,7 @@ async function getClientesAtivos(userId: string) {
     // Buscar os dados completos desses clientes
     const { data: clientes, error: clientesError } = await supabaseAdmin
       .from('clientes')
-      .select('*')
+      .select('id, nome, cpf, telefone, email, endereco, data_nascimento, observacoes, status')
       .eq('user_id', userId)
       .in('id', clienteIdsAtivos);
     
@@ -341,7 +349,7 @@ async function getContratosPorCliente(userId: string, clienteNome: string) {
   console.log(`DEBUG: Obtendo contratos para cliente: ${clienteNome}, user: ${userId}`);
   
   try {
-    // Primeiro, buscar o cliente pelo nome
+    // Primeiro, buscar o cliente pelo nome (busca parcial)
     const { data: clientes, error: clienteError } = await supabaseAdmin
       .from('clientes')
       .select('id, nome')
