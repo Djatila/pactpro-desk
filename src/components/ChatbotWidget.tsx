@@ -7,8 +7,9 @@ import { ChatInterface } from './ChatInterface';
 export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Obter a chave da API do Gemini
-  const geminiApiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || 'AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho';
+  // Obter as chaves da API do Gemini
+  const primaryKey = (import.meta.env.VITE_GEMINI_API_KEY_PRIMARY as string) || 'AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho';
+  const secondaryKey = (import.meta.env.VITE_GEMINI_API_KEY_SECONDARY as string) || 'AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho_FALLBACK';
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -23,7 +24,7 @@ export function ChatbotWidget() {
           isOpen ? "scale-100 opacity-100 translate-y-0" : "scale-90 opacity-0 translate-y-4 pointer-events-none"
         )}
       >
-        {isOpen && <ChatInterface apiKey={geminiApiKey} />}
+        {isOpen && <ChatInterface primaryKey={primaryKey} secondaryKey={secondaryKey} />}
       </div>
 
       {/* Floating Button */}

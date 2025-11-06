@@ -20,13 +20,15 @@ export default defineConfig(({ mode }) => {
     }
   }
   
-  // Injetar a chave Gemini fornecida pelo usuário
-  // Use um valor de fallback genérico se não estiver configurado
-  const geminiApiKey = env.VITE_GEMINI_API_KEY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho";
-  define['import.meta.env.VITE_GEMINI_API_KEY'] = JSON.stringify(geminiApiKey);
+  // Configurar chaves primária e secundária do Gemini
+  const primaryKey = env.VITE_GEMINI_API_KEY_PRIMARY || env.VITE_GEMINI_API_KEY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho";
+  const secondaryKey = env.VITE_GEMINI_API_KEY_SECONDARY || "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho_FALLBACK"; // Fallback genérico
   
-  if (geminiApiKey === "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho") {
-    console.warn('⚠️ Usando chave Gemini hardcoded. Recomenda-se definir VITE_GEMINI_API_KEY no .env.local.');
+  define['import.meta.env.VITE_GEMINI_API_KEY_PRIMARY'] = JSON.stringify(primaryKey);
+  define['import.meta.env.VITE_GEMINI_API_KEY_SECONDARY'] = JSON.stringify(secondaryKey);
+  
+  if (primaryKey === "AIzaSyBi2fE_QZQ0CoQkulL4-xHL1htnVOvk3Ho") {
+    console.warn('⚠️ Usando chave Gemini PRIMÁRIA hardcoded. Defina VITE_GEMINI_API_KEY_PRIMARY no .env.local.');
   }
   
   return {

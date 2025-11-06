@@ -167,10 +167,11 @@ const MessageBubble = ({ message, isStreaming }: MessageBubbleProps) => {
 };
 
 interface ChatInterfaceProps {
-  apiKey: string;
+  primaryKey: string;
+  secondaryKey: string;
 }
 
-export function ChatInterface({ apiKey }: ChatInterfaceProps) {
+export function ChatInterface({ primaryKey, secondaryKey }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -191,51 +192,11 @@ export function ChatInterface({ apiKey }: ChatInterfaceProps) {
   // Chave para localStorage baseada no usuário
   const getStorageKey = () => `maiacred_chat_history_${user?.id || 'guest'}`;
 
-  // Carregar histórico do localStorage
-  useEffect(() => {
-    try {
-      const savedHistory = localStorage.getItem(getStorageKey());
-      if (savedHistory) {
-        const parsed = JSON.parse(savedHistory);
-        // Verificar se o histórico não está muito antigo (7 dias)
-        const savedDate = new Date(parsed.timestamp);
-        const now = new Date();
-        const daysDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
-        
-        if (daysDiff < 7 && parsed.messages && parsed.messages.length > 0) {
-          setMessages(parsed.messages);
-          setShowSuggestions(false);
-          console.log('✅ Histórico de conversas restaurado');
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ Erro ao carregar histórico:', error);
-    }
-  }, [user]);
-
-  // Salvar histórico no localStorage sempre que mensagens mudarem
-  useEffect(() => {
-    if (messages.length > 0) {
-      try {
-        const historyData = {
-          messages: messages,
-          timestamp: new Date().toISOString(),
-        };
-        localStorage.setItem(getStorageKey(), JSON.stringify(historyData));
-      } catch (error) {
-        console.warn('⚠️ Erro ao salvar histórico:', error);
-      }
-    }
-  }, [messages, user]);
-
-  // Inicializar chat com contexto personalizado
-  useEffect(() => {
-    const initChat = async () => {
-      try {
-        const userName = user?.nome || 'usuário';
-        
-        // Instruções de sistema personalizadas
-        const systemInstruction = `Você é a MaiaCred, uma assistente virtual inteligente e prestativa do sistema de gestão de crédito MaiaCred.
+  // Função para inicializar o chat com uma chave específica
+  const initializeChatSession = (apiKey: string, history: any[]) => {
+    const userName = user?.nome || 'usuário';
+    
+    const systemInstruction = `Você é a MaiaCred, uma assistente virtual inteligente e prestativa do sistema de gestão de crédito MaiaCred.
 
 🚨🚨🚨 REGRA OBRIGATÓRIA - VOCÊ DEVE USAR AS FERRAMENTAS! 🚨🚨🚨
 
@@ -335,58 +296,103 @@ CAPACIDADES:
 
 Sempre que o usuário perguntar algo, use as ferramentas disponíveis para buscar informações reais do banco de dados.`;
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-2.0-flash-lite', // Modelo lite: 30 RPM, 1M TPM, 200 RPD - Econômico!
-          systemInstruction: systemInstruction,
-          tools: [{ functionDeclarations: databaseTools as any }],
-        });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-lite',
+      systemInstruction: systemInstruction,
+      tools: [{ functionDeclarations: databaseTools as any }],
+    });
 
-        // Converter mensagens salvas para formato de histórico do Gemini
-        // Filtrar apenas mensagens do usuário e do modelo (excluir a primeira mensagem de boas-vindas se for do modelo)
-        let history = [];
-        if (messages.length > 1) {
-          const historyMessages = messages.slice(0, -1);
-          // Se a primeira mensagem é do modelo (boas-vindas), remover
-          const startIndex = historyMessages[0]?.role === Role.MODEL ? 1 : 0;
-          history = historyMessages.slice(startIndex).map(msg => ({
-            role: msg.role,
-            parts: [{ text: msg.text }],
-          }));
-        }
+    const chatSession = model.startChat({
+      history: history,
+      generationConfig: {
+        temperature: 0.8,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192,
+      },
+    });
+    return chatSession;
+  };
 
-        const chatSession = model.startChat({
-          history: history,
-          generationConfig: {
-            temperature: 0.8,
-            topP: 0.95,
-            topK: 40,
-            maxOutputTokens: 8192,
-          },
-        });
-
-        setChat(chatSession);
+  // Carregar histórico do localStorage
+  useEffect(() => {
+    try {
+      const savedHistory = localStorage.getItem(getStorageKey());
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        const savedDate = new Date(parsed.timestamp);
+        const now = new Date();
+        const daysDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24);
         
-        // Mensagem de boas-vindas apenas se não houver histórico
-        if (messages.length === 0) {
-          setMessages([{
-            role: Role.MODEL,
-            text: `Olá, ${userName}! 👋\n\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\n\n💡 Algumas coisas que posso fazer:\n• Diferenciar entre clientes cadastrados e clientes ativos\n• Mostrar estatísticas de contratos\n• Buscar informações de clientes\n• Listar os principais bancos\n• Verificar contratos próximos do vencimento\n• Acompanhar o progresso da meta\n\n📌 Dica importante:\n• "Clientes cadastrados" = todos os clientes no sistema\n• "Clientes ativos" = apenas clientes com contratos ativos\n\nComo posso ajudar você hoje?`
-          }]);
-        } else {
-          console.log('✅ Chat restaurado com', messages.length, 'mensagens anteriores');
+        if (daysDiff < 7 && parsed.messages && parsed.messages.length > 0) {
+          setMessages(parsed.messages);
+          setShowSuggestions(false);
         }
-        
-        console.log('✅ Chat inicializado com sucesso para', userName);
-      } catch (error) {
-        console.error('❌ Erro ao inicializar chat:', error);
       }
-    };
-
-    if (user) {
-      initChat();
+    } catch (error) {
+      console.warn('⚠️ Erro ao carregar histórico:', error);
     }
-  }, [apiKey, user]);
+  }, [user]);
+
+  // Salvar histórico no localStorage sempre que mensagens mudarem
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        const historyData = {
+          messages: messages,
+          timestamp: new Date().toISOString(),
+        };
+        localStorage.setItem(getStorageKey(), JSON.stringify(historyData));
+      } catch (error) {
+        console.warn('⚠️ Erro ao salvar histórico:', error);
+      }
+    }
+  }, [messages, user]);
+
+  // Inicializar chat com chave primária
+  useEffect(() => {
+    if (!user) return;
+
+    // Converter mensagens salvas para formato de histórico do Gemini
+    let history = [];
+    if (messages.length > 1) {
+      const historyMessages = messages.slice(0, -1);
+      const startIndex = historyMessages[0]?.role === Role.MODEL ? 1 : 0;
+      history = historyMessages.slice(startIndex).map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.text }],
+      }));
+    }
+
+    try {
+      const chatSession = initializeChatSession(primaryKey, history);
+      setChat(chatSession);
+      
+      if (messages.length === 0) {
+        const userName = user?.nome || 'Usuário';
+        setMessages([{
+          role: Role.MODEL,
+          text: `Olá, ${userName}! 👋\n\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\n\n💡 Algumas coisas que posso fazer:\n• Diferenciar entre clientes cadastrados e clientes ativos\n• Mostrar estatísticas de contratos\n• Buscar informações de clientes\n• Listar os principais bancos\n• Verificar contratos próximos do vencimento\n• Acompanhar o progresso da meta\n\n📌 Dica importante:\n• "Clientes cadastrados" = todos os clientes no sistema\n• "Clientes ativos" = apenas clientes com contratos ativos\n\nComo posso ajudar você hoje?`
+        }]);
+      }
+      console.log('✅ Chat inicializado com chave PRIMÁRIA.');
+    } catch (error) {
+      console.error('❌ Erro ao inicializar chat com chave PRIMÁRIA:', error);
+      setError('Falha ao inicializar o modelo de chat. Tentando chave secundária...');
+      
+      // Tentar chave secundária
+      try {
+        const chatSession = initializeChatSession(secondaryKey, history);
+        setChat(chatSession);
+        setError(null);
+        console.log('✅ Chat inicializado com chave SECUNDÁRIA.');
+      } catch (e) {
+        console.error('❌ Erro ao inicializar chat com chave SECUNDÁRIA:', e);
+        setError('Falha crítica ao inicializar o modelo de chat com ambas as chaves.');
+      }
+    }
+  }, [primaryKey, secondaryKey, user]);
 
   // Auto-scroll
   useEffect(() => {
@@ -400,12 +406,9 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
       const token = session?.access_token;
 
       if (!token) {
-        console.warn('⚠️ Token não disponível');
         return { error: 'Usuário não autenticado' };
       }
 
-      console.log('📤 Enviando para Edge Function:', args);
-      
       const response = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
         headers: {
@@ -418,14 +421,11 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
       const responseData = await response.json();
       
       if (!response.ok) {
-        console.error('❌ Erro HTTP:', response.status, responseData);
         return { error: responseData.error || `HTTP ${response.status}` };
       }
 
-      console.log('✅ Resposta da Edge Function:', responseData);
       return responseData;
     } catch (error: any) {
-      console.error('❌ Erro na Edge Function:', error);
       return { error: error.message };
     }
   };
@@ -436,66 +436,40 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
     const messageText = customMessage || inputValue.trim();
     if (!messageText || !chat || isLoading) return;
 
-    setShowSuggestions(false); // Esconder sugestões após primeira mensagem
+    setShowSuggestions(false);
     const userMessage: ChatMessage = { role: Role.USER, text: messageText };
     
-    // Adicionar a mensagem do usuário e o placeholder do modelo em uma única atualização
     setMessages(prev => [...prev, userMessage, { role: Role.MODEL, text: '' }]);
     
     setInputValue('');
     setIsLoading(true);
     setError(null);
 
-    // O índice da mensagem do modelo é o último elemento do array
     const modelMessageIndex = messages.length + 1;
 
     try {
       
-      console.log('🤖 Chamando Gemini...');
-      const result = await chat.sendMessage(userMessage.text);
-      const response = result.response;
+      let result = await chat.sendMessage(userMessage.text);
+      let response = result.response;
       
-      console.log('✅ Resposta do Gemini recebida:', response);
-      
-      // Tentar obter texto e function calls com tratamento de erro
-      let text = '';
-      let functionCalls = null;
-      
-      try {
-        text = response.text();
-      } catch (textError) {
-        console.warn('⚠️ Erro ao obter texto da resposta:', textError);
-        text = '';
-      }
-      
-      try {
-        functionCalls = response.functionCalls();
-      } catch (fcError) {
-        console.warn('⚠️ Erro ao obter function calls:', fcError);
-        functionCalls = null;
-      }
-      
-      console.log('📝 Text:', text);
-      console.log('🔧 FunctionCalls:', functionCalls);
+      let text = response.text();
+      let functionCalls = response.functionCalls();
       
       // Loop para lidar com Tool Calling
       while (functionCalls && functionCalls.length > 0) {
-        console.log('🔧 Function calls detectados:', functionCalls);
         const toolCall = functionCalls[0];
         const toolName = toolCall.name;
         const toolArgs = toolCall.args;
 
-        // 1. Atualizar a mensagem com a chamada da ferramenta
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[modelMessageIndex].toolCalls = response.functionCalls;
-            newMessages[modelMessageIndex].text = ''; // Limpar texto para o streaming
+            newMessages[modelMessageIndex].text = '';
             return newMessages;
         });
 
         let toolResult;
         
-        // Mapear nome da ferramenta para operação da Edge Function
         const toolOperationMap: Record<string, string> = {
           'queryDatabase': 'query',
           'getClientesAtivos': 'clientesAtivos',
@@ -511,23 +485,20 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         const operation = toolOperationMap[toolName];
         
         if (operation) {
-          // Adicionar operation aos argumentos se não existir
           const edgeFunctionArgs = { ...toolArgs, operation };
           toolResult = await callSupabaseEdgeFunction(edgeFunctionArgs);
         } else {
           toolResult = { error: `Ferramenta desconhecida: ${toolName}` };
         }
         
-        // 2. Atualizar a mensagem com o resultado da ferramenta
         setMessages(prev => {
             const newMessages = [...prev];
             newMessages[modelMessageIndex].toolResponse = toolResult;
-            newMessages[modelMessageIndex].text = ''; // Limpar texto novamente antes do streaming
+            newMessages[modelMessageIndex].text = '';
             return newMessages;
         });
 
-        // 3. Enviar o resultado da ferramenta de volta para o Gemini
-        const result = await chat.sendMessage([{
+        result = await chat.sendMessage([{
           functionResponse: {
             name: toolName,
             response: {
@@ -536,86 +507,91 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
           },
         }]);
         
-        const newResponse = result.response;
+        response = result.response;
+        text = response.text();
+        functionCalls = response.functionCalls();
         
-        // Tentar obter texto e function calls com tratamento de erro
-        let newText = '';
-        let newFunctionCalls = null;
-        
-        try {
-          newText = newResponse.text();
-        } catch (textError) {
-          console.warn('⚠️ Erro ao obter texto da nova resposta:', textError);
-          newText = '';
-        }
-        
-        try {
-          newFunctionCalls = newResponse.functionCalls();
-        } catch (fcError) {
-          console.warn('⚠️ Erro ao obter novos function calls:', fcError);
-          newFunctionCalls = null;
-        }
-        
-        console.log('📝 Nova resposta após tool:', newText);
-        console.log('🔧 Novos function calls:', newFunctionCalls);
-        
-        // Atualizar mensagem com o texto final
         setMessages(prev => {
           const newMessages = [...prev];
-          newMessages[modelMessageIndex].text = newText;
+          newMessages[modelMessageIndex].text = text;
           return newMessages;
         });
         
-        // Se não há mais function calls, terminar o loop
-        if (!newFunctionCalls || newFunctionCalls.length === 0) {
-          console.log('✅ Loop de function calls finalizado');
+        if (!functionCalls || functionCalls.length === 0) {
           break;
         }
-        
-        // Atualizar para próxima iteração
-        functionCalls = newFunctionCalls;
       }
       
-      // Se não houve function calls e não há texto, exibir o texto ou mensagem de erro
-      if (!functionCalls || functionCalls.length === 0) {
-        if (text) {
-          // Exibir o texto da resposta
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[modelMessageIndex].text = text;
-            return newMessages;
-          });
-        } else {
-          console.warn('⚠️ Resposta vazia do Gemini!');
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[modelMessageIndex].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
-            return newMessages;
-          });
-        }
+      if (text) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[modelMessageIndex].text = text;
+          return newMessages;
+        });
+      } else {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[modelMessageIndex].text = 'Desculpe, não consegui gerar uma resposta. Tente novamente.';
+          return newMessages;
+        });
       }
       
-    } catch (e) {
+    } catch (e: any) {
       console.error("ERRO CRÍTICO NO CHATBOT:", e);
       
-      let errorMessage = 'Ocorreu um erro desconhecido.';
-      if (e instanceof Error) {
-        errorMessage = e.message;
-      }
+      let errorMessage = e.message || 'Ocorreu um erro desconhecido.';
       
-      // Tentar extrair a mensagem de erro da API se for um objeto JSON
+      // Tentar extrair a mensagem de erro da API
       try {
         const apiErrorMatch = errorMessage.match(/\{"error":\{"code":\d+,"message":"([^"]+)","status":"[^"]+"\}\}/);
         if (apiErrorMatch && apiErrorMatch[1]) {
           errorMessage = `Erro da API: ${apiErrorMatch[1]}`;
         }
       } catch (parseError) {
-        // Ignorar erro de parse se a mensagem não for JSON
+        // Ignorar
       }
       
-      setError(`Erro: ${errorMessage}`);
-      setMessages(prev => prev.slice(0, -1)); // Remove the placeholder
-      setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro. ${errorMessage}` }]);
+      // Se a chave primária falhou, tentar a secundária
+      if (errorMessage.includes('API key not valid') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        console.warn('⚠️ Chave primária falhou. Tentando chave secundária...');
+        
+        try {
+          // 1. Reinicializar o chat com a chave secundária
+          const history = messages.map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.text }],
+          }));
+          const newChatSession = initializeChatSession(secondaryKey, history);
+          setChat(newChatSession);
+          
+          // 2. Tentar enviar a mensagem novamente com a nova sessão
+          const retryResult = await newChatSession.sendMessage(userMessage.text);
+          const retryResponse = retryResult.response;
+          
+          // 3. Processar a resposta da retentativa (sem loop de tool calling para simplificar)
+          const retryText = retryResponse.text();
+          
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[modelMessageIndex].text = retryText || 'Resposta da chave secundária.';
+            return newMessages;
+          });
+          
+          setError(null);
+          console.log('✅ Retentativa com chave secundária bem-sucedida.');
+          
+        } catch (retryError: any) {
+          console.error('❌ Ambas as chaves falharam:', retryError);
+          setError(`Erro: Ambas as chaves de API falharam. ${retryError.message}`);
+          setMessages(prev => prev.slice(0, -1));
+          setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro crítico. Ambas as chaves de API falharam. ${retryError.message}` }]);
+        }
+      } else {
+        // Erro não relacionado à chave (ex: erro de Edge Function)
+        setError(`Erro: ${errorMessage}`);
+        setMessages(prev => prev.slice(0, -1));
+        setMessages(prev => [...prev, { role: Role.MODEL, text: `Desculpe, encontrei um erro. ${errorMessage}` }]);
+      }
     } finally {
       setIsLoading(false);
     }
