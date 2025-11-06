@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import type {
@@ -93,7 +93,7 @@ interface DataContextType {
   // Função para download de PDF
   downloadContratoPdf: (contratoId: string) => Promise<void>;
   // Funções para gerenciamento de tipos de contrato
-  loadTiposContrato: () => Promise<any[]>;
+  loadTiposContrato: (contratosAtuais?: Contrato[]) => Promise<any[]>;
   addTipoContrato: (tipo: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<boolean>;
   updateTipoContrato: (id: string, tipo: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => Promise<boolean>;
   deleteTipoContrato: (id: string) => Promise<boolean>;
@@ -123,7 +123,7 @@ export function DataProvider({ children }: DataProviderProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Função utilitária para detectar erros de configuração
-  const handleSupabaseError = (error: any, operation: string) => {
+  const handleSupabaseError = useCallback((error: any, operation: string) => {
     console.error(`Erro ao ${operation}:`, error);
     
     if (error?.message?.includes('disabled') || error?.message?.includes('Feature is disabled')) {
@@ -142,89 +142,16 @@ export function DataProvider({ children }: DataProviderProps) {
     } else {
       setError(`Erro ao ${operation}`);
     }
-  };
+  }, []);
 
-  // Carregar dados quando o usuário estiver autenticado
-  useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      console.log('Usuário autenticado, iniciando carregamento de dados...');
-      refreshData();
-    } else {
-      // Limpar dados quando não autenticado
-      console.log('Usuário não autenticado, limpando dados...');
-      setClientes([]);
-      setBancos([]);
-      setContratos([]);
-      setMetaAnual(180000);
-    }
-  }, [isAuthenticated, user?.id]); // Usar user?.id em vez de user completo
-
-  const refreshData = async () => {
-    if (!user) return;
-    
-    // Verificar se o Supabase está configurado
-    if (!supabase || typeof supabase.from !== 'function') {
-      setIsLoading(false);
-      return;
-    }
-    
-    // Tentar carregar do cache primeiro para feedback instantâneo
-    const cachedData = localStorage.getItem(`maiacred_data_${user.id}`);
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        setClientes(parsed.clientes || []);
-        setBancos(parsed.bancos || []);
-        setContratos(parsed.contratos || []);
-        setMetaAnual(parsed.metaAnual || 180000);
-        console.log('✅ Dados carregados do cache');
-      } catch (e) {
-        console.warn('Erro ao carregar cache:', e);
-      }
-    }
-    
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('🔄 Atualizando dados do servidor...');
-      const startTime = performance.now();
-      
-      // Carregar TUDO em paralelo para máxima velocidade
-      const [clientesResult, bancosResult, contratosResult, metaResult] = await Promise.all([
-        loadClientes(),
-        loadBancos(),
-        loadContratos(),
-        loadMetaAnual()
-      ]);
-      
-      const endTime = performance.now();
-      console.log(`✅ Dados atualizados em ${(endTime - startTime).toFixed(0)}ms`);
-      
-      // Salvar no cache para próxima vez
-      const dataToCache = {
-        clientes: clientesResult,
-        bancos: bancosResult,
-        contratos: contratosResult,
-        metaAnual: metaResult,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(`maiacred_data_${user.id}`, JSON.stringify(dataToCache));
-      
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setError('Erro ao carregar dados');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadClientes = async () => {
+  // Funções de carregamento (memorizadas)
+  const loadClientes = useCallback(async () => {
+    if (!user) return [];
     try {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('nome');
 
       if (error) throw error;
@@ -248,14 +175,15 @@ export function DataProvider({ children }: DataProviderProps) {
       console.error('Erro ao carregar clientes:', error);
       return [];
     }
-  };
+  }, [user]);
 
-  const loadBancos = async () => {
+  const loadBancos = useCallback(async () => {
+    if (!user) return [];
     try {
       const { data, error } = await supabase
         .from('bancos')
         .select('*')
-        .eq('user_id', user?.id) // Adicionar filtro por user_id
+        .eq('user_id', user.id) // Adicionar filtro por user_id
         .order('nome');
 
       if (error) throw error;
@@ -279,9 +207,10 @@ export function DataProvider({ children }: DataProviderProps) {
       console.error('Erro ao carregar bancos:', error);
       return [];
     }
-  };
+  }, [user]);
 
-  const loadContratos = async () => {
+  const loadContratos = useCallback(async () => {
+    if (!user) return [];
     try {
       const { data, error } = await supabase
         .from('contratos')
@@ -290,7 +219,7 @@ export function DataProvider({ children }: DataProviderProps) {
           clientes!contratos_cliente_id_fkey(nome),
           bancos!contratos_banco_id_fkey(nome)
         `)
-        .eq('user_id', user?.id) // Adicionar filtro por user_id
+        .eq('user_id', user.id) // Adicionar filtro por user_id
         .order('data_emprestimo', { ascending: false });
 
       if (error) throw error;
@@ -358,20 +287,20 @@ export function DataProvider({ children }: DataProviderProps) {
       });
 
       setContratos(contratosFormatted);
-      updateMetrics(contratosFormatted);
       return contratosFormatted;
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
       return [];
     }
-  };
+  }, [user]);
 
-  const loadMetaAnual = async () => {
+  const loadMetaAnual = useCallback(async () => {
+    if (!user) return 180000;
     try {
       const { data, error } = await supabase
         .from('configuracoes')
         .select('meta_anual')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -388,9 +317,9 @@ export function DataProvider({ children }: DataProviderProps) {
       console.error('Erro ao carregar meta anual:', error);
       return 180000;
     }
-  };
+  }, [user]);
 
-  const updateMetrics = (contratos: Contrato[]) => {
+  const updateMetrics = useCallback((contratos: Contrato[]) => {
     console.log('Atualizando métricas com contratos:', contratos);
     
     // Atualizar métricas dos clientes apenas se houver mudança
@@ -452,10 +381,89 @@ export function DataProvider({ children }: DataProviderProps) {
       const hasChanges = updatedBancos.some((banco, index) => banco !== prev[index]);
       return hasChanges ? updatedBancos : prev;
     });
-  };
+  }, []); // Dependências vazias, pois setClientes e setBancos são funções de estado estáveis
 
-  // Funções para CRUD de clientes
-  const addCliente = async (clienteData: Omit<Cliente, 'id' | 'contratos' | 'status'>): Promise<boolean> => {
+  // Função principal de refresh (memorizada)
+  const refreshData = useCallback(async () => {
+    if (!user) return;
+    
+    // Verificar se o Supabase está configurado
+    if (!supabase || typeof supabase.from !== 'function') {
+      setIsLoading(false);
+      return;
+    }
+    
+    // Tentar carregar do cache primeiro para feedback instantâneo
+    const cachedData = localStorage.getItem(`maiacred_data_${user.id}`);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        setClientes(parsed.clientes || []);
+        setBancos(parsed.bancos || []);
+        setContratos(parsed.contratos || []);
+        setMetaAnual(parsed.metaAnual || 180000);
+        console.log('✅ Dados carregados do cache');
+      } catch (e) {
+        console.warn('Erro ao carregar cache:', e);
+      }
+    }
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('🔄 Atualizando dados do servidor...');
+      const startTime = performance.now();
+      
+      // Carregar TUDO em paralelo para máxima velocidade
+      const [clientesResult, contratosResult, metaResult, bancosResult] = await Promise.all([
+        loadClientes(),
+        loadContratos(),
+        loadMetaAnual(),
+        loadBancos()
+      ]);
+      
+      // Atualizar métricas após carregar contratos
+      updateMetrics(contratosResult);
+      
+      const endTime = performance.now();
+      console.log(`✅ Dados atualizados em ${(endTime - startTime).toFixed(0)}ms`);
+      
+      // Salvar no cache para próxima vez
+      const dataToCache = {
+        clientes: clientesResult,
+        bancos: bancosResult,
+        contratos: contratosResult,
+        metaAnual: metaResult,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`maiacred_data_${user.id}`, JSON.stringify(dataToCache));
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, loadClientes, loadContratos, loadMetaAnual, loadBancos, updateMetrics]);
+
+  // Efeito para carregar dados na autenticação (só roda uma vez por login)
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      console.log('Usuário autenticado, iniciando carregamento de dados...');
+      refreshData();
+    } else {
+      // Limpar dados quando não autenticado
+      console.log('Usuário não autenticado, limpando dados...');
+      setClientes([]);
+      setBancos([]);
+      setContratos([]);
+      setMetaAnual(180000);
+    }
+  }, [isAuthenticated, user?.id, refreshData]); // refreshData agora é estável
+
+  // Funções para CRUD de clientes (memorizadas)
+  const addCliente = useCallback(async (clienteData: Omit<Cliente, 'id' | 'contratos' | 'status'>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -489,9 +497,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadClientes, loadContratos, handleSupabaseError]);
 
-  const updateCliente = async (id: string, clienteData: Partial<Cliente>): Promise<boolean> => {
+  const updateCliente = useCallback(async (id: string, clienteData: Partial<Cliente>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -526,9 +534,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadClientes, loadContratos, handleSupabaseError]);
 
-  const deleteCliente = async (id: string): Promise<boolean> => {
+  const deleteCliente = useCallback(async (id: string): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -553,10 +561,10 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadClientes, loadContratos, handleSupabaseError]);
 
-  // Continua com as demais funções...
-  const addBanco = async (bancoData: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>): Promise<boolean> => {
+  // Funções para CRUD de bancos (memorizadas)
+  const addBanco = useCallback(async (bancoData: Omit<Banco, 'id' | 'contratos' | 'volumeTotal' | 'status'>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -589,9 +597,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadBancos, loadContratos, handleSupabaseError]);
 
-  const updateBanco = async (id: string, bancoData: Partial<Banco>): Promise<boolean> => {
+  const updateBanco = useCallback(async (id: string, bancoData: Partial<Banco>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -626,9 +634,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadBancos, loadContratos, handleSupabaseError]);
 
-  const deleteBanco = async (id: string): Promise<boolean> => {
+  const deleteBanco = useCallback(async (id: string): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -654,9 +662,10 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadBancos, loadContratos, handleSupabaseError]);
 
-  const addContrato = async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status' | 'parcelasPagas' | 'parcelasRestantes' | 'mesesRestantes'>): Promise<boolean> => {
+  // Funções para CRUD de contratos (memorizadas)
+  const addContrato = useCallback(async (contratoData: Omit<Contrato, 'id' | 'clienteNome' | 'bancoNome' | 'valorParcela' | 'receitaAgente' | 'status' | 'parcelasPagas' | 'parcelasRestantes' | 'mesesRestantes'>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -703,9 +712,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadContratos, loadClientes, loadBancos, handleSupabaseError]);
 
-  const updateContrato = async (id: string, contratoData: Partial<Contrato>): Promise<boolean> => {
+  const updateContrato = useCallback(async (id: string, contratoData: Partial<Contrato>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -755,10 +764,108 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadContratos, loadClientes, loadBancos, handleSupabaseError]);
 
-  // Função para verificar se o bucket existe
-  const checkStorageBucket = async (): Promise<boolean> => {
+  // Função para atualizar um único contrato após mudanças no PDF (memorizada)
+  const updateSingleContrato = useCallback(async (contratoId: string) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          clientes!contratos_cliente_id_fkey(nome),
+          bancos!contratos_banco_id_fkey(nome)
+        `)
+        .eq('id', contratoId)
+        .eq('user_id', user.id) // Adicionar filtro por user_id
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const valorParcela = data.valor_total / data.parcelas;
+        const receitaAgente = data.valor_total * (data.taxa / 100);
+
+        // Recalcular parcelas pagas e restantes para o contrato atualizado
+        let parcelasPagas = 0;
+        let mesesRestantes = data.parcelas;
+
+        try {
+          const [day, month, year] = data.data_emprestimo.split('/');
+          const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          const hoje = new Date();
+
+          const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
+          const diffMonths = hoje.getMonth() - dataInicio.getMonth();
+          const totalMonthsPassed = diffYears * 12 + diffMonths;
+
+          parcelasPagas = Math.max(0, Math.min(data.parcelas, totalMonthsPassed));
+          mesesRestantes = Math.max(0, data.parcelas - parcelasPagas);
+        } catch (dateError) {
+          console.warn('Erro ao recalcular parcelas pagas para contrato:', data.id, dateError);
+        }
+
+        const contratoFormatted: Contrato = {
+          id: data.id,
+          clienteId: data.cliente_id,
+          clienteNome: (data.clientes as any)?.nome || 'Cliente não encontrado',
+          bancoId: data.banco_id,
+          bancoNome: (data.bancos as any)?.nome || 'Banco não encontrado',
+          tipoContrato: data.tipo_contrato,
+          dataEmprestimo: data.data_emprestimo,
+          valorTotal: data.valor_total,
+          parcelas: data.parcelas,
+          valorParcela: valorParcela.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+          }),
+          taxa: data.taxa,
+          receitaAgente: receitaAgente.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+          }),
+          status: data.status,
+          observacoes: data.observacoes,
+          // Novos campos
+          primeiroVencimento: data.primeiro_vencimento,
+          valorOperacao: data.valor_operacao,
+          valorSolicitado: data.valor_solicitado,
+          valorPrestacao: data.valor_prestacao,
+          // Campos para PDF
+          pdfUrl: data.pdf_url,
+          pdfName: data.pdf_name,
+          // Novos campos calculados
+          parcelasPagas,
+          parcelasRestantes: data.parcelas - parcelasPagas,
+          mesesRestantes
+        };
+
+        // Atualizar o contrato específico no estado
+        setContratos(prev => {
+          // Verificar se o contrato já existe no estado
+          const contratoExists = prev.some(c => c.id === contratoId);
+          
+          if (contratoExists) {
+            // Se existe, atualizar apenas esse contrato
+            return prev.map(c => c.id === contratoId ? contratoFormatted : c);
+          } else {
+            // Se não existe, adicionar o novo contrato
+            return [...prev, contratoFormatted];
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar contrato individual:', error);
+      // Se falhar, recarregar todos os contratos
+      await loadContratos();
+    }
+  }, [user, loadContratos]);
+
+  // Função para verificar se o bucket existe (memorizada)
+  const checkStorageBucket = useCallback(async (): Promise<boolean> => {
     try {
       if (!supabase.storage) {
         throw new Error('Serviço de storage não disponível');
@@ -813,10 +920,10 @@ export function DataProvider({ children }: DataProviderProps) {
       console.error('Erro ao verificar bucket:', error);
       return false;
     }
-  };
+  }, []);
 
-  // Função para upload de PDF do contrato
-  const uploadContratoPdf = async (contratoId: string, file: File | null): Promise<boolean> => {
+  // Função para upload de PDF do contrato (memorizada)
+  const uploadContratoPdf = useCallback(async (contratoId: string, file: File | null): Promise<boolean> => {
     // Verificar autenticação do usuário
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
@@ -948,107 +1055,10 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, checkStorageBucket, updateSingleContrato, handleSupabaseError]);
 
-  // Função para atualizar um único contrato após mudanças no PDF
-  const updateSingleContrato = async (contratoId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('contratos')
-        .select(`
-          *,
-          clientes!contratos_cliente_id_fkey(nome),
-          bancos!contratos_banco_id_fkey(nome)
-        `)
-        .eq('id', contratoId)
-        .eq('user_id', user?.id) // Adicionar filtro por user_id
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        const valorParcela = data.valor_total / data.parcelas;
-        const receitaAgente = data.valor_total * (data.taxa / 100);
-
-        // Recalcular parcelas pagas e restantes para o contrato atualizado
-        let parcelasPagas = 0;
-        let mesesRestantes = data.parcelas;
-
-        try {
-          const [day, month, year] = data.data_emprestimo.split('/');
-          const dataInicio = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-          const hoje = new Date();
-
-          const diffYears = hoje.getFullYear() - dataInicio.getFullYear();
-          const diffMonths = hoje.getMonth() - dataInicio.getMonth();
-          const totalMonthsPassed = diffYears * 12 + diffMonths;
-
-          parcelasPagas = Math.max(0, Math.min(data.parcelas, totalMonthsPassed));
-          mesesRestantes = Math.max(0, data.parcelas - parcelasPagas);
-        } catch (dateError) {
-          console.warn('Erro ao recalcular parcelas pagas para contrato:', data.id, dateError);
-        }
-
-        const contratoFormatted: Contrato = {
-          id: data.id,
-          clienteId: data.cliente_id,
-          clienteNome: (data.clientes as any)?.nome || 'Cliente não encontrado',
-          bancoId: data.banco_id,
-          bancoNome: (data.bancos as any)?.nome || 'Banco não encontrado',
-          tipoContrato: data.tipo_contrato,
-          dataEmprestimo: data.data_emprestimo,
-          valorTotal: data.valor_total,
-          parcelas: data.parcelas,
-          valorParcela: valorParcela.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-            minimumFractionDigits: 2
-          }),
-          taxa: data.taxa,
-          receitaAgente: receitaAgente.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-            minimumFractionDigits: 2
-          }),
-          status: data.status,
-          observacoes: data.observacoes,
-          // Novos campos
-          primeiroVencimento: data.primeiro_vencimento,
-          valorOperacao: data.valor_operacao,
-          valorSolicitado: data.valor_solicitado,
-          valorPrestacao: data.valor_prestacao,
-          // Campos para PDF
-          pdfUrl: data.pdf_url,
-          pdfName: data.pdf_name,
-          // Novos campos calculados
-          parcelasPagas,
-          parcelasRestantes: data.parcelas - parcelasPagas,
-          mesesRestantes
-        };
-
-        // Atualizar o contrato específico no estado
-        setContratos(prev => {
-          // Verificar se o contrato já existe no estado
-          const contratoExists = prev.some(c => c.id === contratoId);
-          
-          if (contratoExists) {
-            // Se existe, atualizar apenas esse contrato
-            return prev.map(c => c.id === contratoId ? contratoFormatted : c);
-          } else {
-            // Se não existe, adicionar o novo contrato
-            return [...prev, contratoFormatted];
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar contrato individual:', error);
-      // Se falhar, recarregar todos os contratos
-      await loadContratos();
-    }
-  };
-
-  // Função para download do PDF do contrato
-  const downloadContratoPdf = async (contratoId: string): Promise<void> => {
+  // Função para download do PDF do contrato (memorizada)
+  const downloadContratoPdf = useCallback(async (contratoId: string): Promise<void> => {
     if (!user) return;
     
     setIsLoading(true);
@@ -1073,9 +1083,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, contratos, handleSupabaseError]);
 
-  const deleteContrato = async (id: string): Promise<boolean> => {
+  const deleteContrato = useCallback(async (id: string): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -1104,9 +1114,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, loadContratos, loadClientes, loadBancos, handleSupabaseError]);
 
-  const updateMetaAnual = async (meta: number): Promise<boolean> => {
+  const updateMetaAnual = useCallback(async (meta: number): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -1133,19 +1143,18 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, handleSupabaseError]);
 
-  const getClienteById = (id: string) => {
+  const getClienteById = useCallback((id: string) => {
     return clientes.find(cliente => cliente.id === id);
-  };
+  }, [clientes]);
 
-  const getBancoById = (id: string) => {
+  const getBancoById = useCallback((id: string) => {
     return bancos.find(banco => banco.id === id);
-  };
+  }, [bancos]);
 
-  // Funções para gerenciamento de tipos de contrato
-  // Função para carregar tipos de contrato do banco de dados
-  const loadTiposContrato = async (contratosAtuais?: Contrato[]): Promise<any[]> => {
+  // Funções para gerenciamento de tipos de contrato (memorizadas)
+  const loadTiposContrato = useCallback(async (contratosAtuais?: Contrato[]): Promise<any[]> => {
     if (!user) {
       return [];
     }
@@ -1232,9 +1241,9 @@ export function DataProvider({ children }: DataProviderProps) {
         { value: 'emp-bpc-loas', label: 'Emp. BPC LOAS', isDefault: true }
       ];
     }
-  };
+  }, [user, contratos]);
 
-  const addTipoContrato = async (tipoData: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<boolean> => {
+  const addTipoContrato = useCallback(async (tipoData: Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -1259,9 +1268,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, handleSupabaseError]);
 
-  const updateTipoContrato = async (id: string, tipoData: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<boolean> => {
+  const updateTipoContrato = useCallback(async (id: string, tipoData: Partial<Omit<TipoContratoDB, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -1283,9 +1292,9 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, handleSupabaseError]);
 
-  const deleteTipoContrato = async (id: string): Promise<boolean> => {
+  const deleteTipoContrato = useCallback(async (id: string): Promise<boolean> => {
     if (!user) return false;
     
     setIsLoading(true);
@@ -1321,7 +1330,7 @@ export function DataProvider({ children }: DataProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, handleSupabaseError]);
 
   const value: DataContextType = {
     clientes,
