@@ -301,9 +301,9 @@ REGRAS DE CONSULTA DE BANCOS:
 - Para listar bancos inativos, use queryDatabase com tableName="bancos" e filters: { status: "inativo" }
 
 **REGRAS DE FORMATAÇÃO CRÍTICAS:**
-- **Listas:** Sempre use listas formatadas com Markdown (`- ` ou `* ` ou `1. `) e **quebras de linha** (`\\n`) entre os itens para garantir a legibilidade.
-- **Dados Agregados:** Use negrito (`**`) para valores importantes (ex: "Sua receita total é de **R$ 10.000,00**").
-- **Quebras de Linha:** Use quebras de linha duplas (`\\n\\n`) para separar parágrafos e tópicos.
+- **Listas:** Sempre use listas formatadas com Markdown (\`- \` ou \`* \` ou \`1. \`) e **quebras de linha** (\`\\n\`) entre os itens para garantir a legibilidade.
+- **Dados Agregados:** Use negrito (\`**\`) para valores importantes (ex: "Sua receita total é de \`**R$ 10.000,00**\`").
+- **Quebras de Linha:** Use quebras de linha duplas (\`\\n\\n\`) para separar parágrafos e tópicos.
 - **Emojis:** Use emojis relevantes (ex: 👥, 🏦, 📄) para categorizar a informação.
 
 EXEMPLOS OBRIGATÓRIOS DE COMO RESPONDER:
@@ -371,7 +371,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
         if (messages.length === 0) {
           setMessages([{
             role: Role.MODEL,
-            text: `Olá, ${userName}! 👋\\n\\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\\n\\n💡 Algumas coisas que posso fazer:\\n• Diferenciar entre clientes cadastrados e clientes ativos\\n• Mostrar estatísticas de contratos\\n• Buscar informações de clientes\\n• Listar os principais bancos\\n• Verificar contratos próximos do vencimento\\n• Acompanhar o progresso da meta\\n\\n📌 Dica importante:\\n• "Clientes cadastrados" = todos os clientes no sistema\\n• "Clientes ativos" = apenas clientes com contratos ativos\\n\\nComo posso ajudar você hoje?`
+            text: `Olá, ${userName}! 👋\n\nSou a MaiaCred, sua assistente virtual. Estou aqui para ajudar você com informações sobre clientes, contratos, bancos e estatísticas do sistema.\n\n💡 Algumas coisas que posso fazer:\n• Diferenciar entre clientes cadastrados e clientes ativos\n• Mostrar estatísticas de contratos\n• Buscar informações de clientes\n• Listar os principais bancos\n• Verificar contratos próximos do vencimento\n• Acompanhar o progresso da meta\n\n📌 Dica importante:\n• "Clientes cadastrados" = todos os clientes no sistema\n• "Clientes ativos" = apenas clientes com contratos ativos\n\nComo posso ajudar você hoje?`
           }]);
         } else {
           console.log('✅ Chat restaurado com', messages.length, 'mensagens anteriores');
@@ -629,7 +629,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
       localStorage.removeItem(getStorageKey());
       setMessages([{
         role: Role.MODEL,
-        text: `Olá, ${userName}! 👋\\n\\nHistórico limpo! Sou a MaiaCred, sua assistente virtual.\\n\\nComo posso ajudar você hoje?`
+        text: `Olá, ${userName}! 👋\n\nHistórico limpo! Sou a MaiaCred, sua assistente virtual.\n\nComo posso ajudar você hoje?`
       }]);
       setShowSuggestions(true);
       console.log('🗑️ Histórico de conversas limpo');
