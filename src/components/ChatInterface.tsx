@@ -112,7 +112,7 @@ const databaseTools = [
 
 // Componentes auxiliares
 const UserIcon = () => (
-  <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
+  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
     </svg>
@@ -152,7 +152,9 @@ const MessageBubble = ({ message, isStreaming }: MessageBubbleProps) => {
 
   return (
     <div className={`flex items-start gap-3 w-full max-w-2xl mx-auto ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      {/* Renderiza o ícone correto e inverte a ordem para o usuário */}
       {isUser ? <UserIcon /> : <BotIcon />}
+      
       <div className={`px-4 py-3 text-white ${bubbleClasses} max-w-[80%]`}>
         {showLoading && <LoadingIndicator />}
         <p className="whitespace-pre-wrap text-sm">{message.text}</p>
@@ -448,7 +450,7 @@ Sempre que o usuário perguntar algo, use as ferramentas disponíveis para busca
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
-    setError(null); // Limpar erro aqui
+    setError(null);
 
     const currentMessageIndex = messages.length + 1;
     setMessages(prev => [...prev, { role: Role.MODEL, text: '' }]);
