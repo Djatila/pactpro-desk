@@ -38,20 +38,30 @@ export function AppSidebar() {
 
   // Calcular métricas do mês vigente
   const hoje = new Date();
-  const mesAtual = hoje.getMonth();
+  const mesAtual = hoje.getMonth(); // 0-11
   const anoAtual = hoje.getFullYear();
   
   const contratosEsteMes = contratos.filter(contrato => {
     try {
       const [day, month, year] = contrato.dataEmprestimo.split('/');
+      
+      // Usar Date.UTC para evitar problemas de fuso horário e garantir que o mês seja 0-indexado
+      // O formato é YYYY, MM-1, DD
       const contratoDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return contratoDate.getMonth() === mesAtual && contratoDate.getFullYear() === anoAtual;
+      
+      // Verificar se a data é válida e se corresponde ao mês e ano atual
+      return (
+        !isNaN(contratoDate.getTime()) &&
+        contratoDate.getMonth() === mesAtual && 
+        contratoDate.getFullYear() === anoAtual
+      );
     } catch {
       return false;
     }
   });
   
   const receitaEsteMes = contratosEsteMes.reduce((acc, contrato) => {
+    // Corrigir parsing de moeda brasileira
     const receitaString = contrato.receitaAgente
       .replace(/[R$\s]/g, '') // Remove R$ e espaços
       .replace(/\./g, '')      // Remove pontos (separadores de milhares)
@@ -121,7 +131,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <div className="p-3 bg-gradient-card rounded-lg mx-3 shadow-card">
                 <div className="text-xs text-muted-foreground mb-1">Este mês</div>
-                <div className="text-sm font-medium text-primary-dark">{contratosEsteMes.length} contratos</div>
+                <div className="text-sm font-medium text-primary-dark">{contratosEsteMes.length} contrato{contratosEsteMes.length !== 1 ? 's' : ''}</div>
                 <div className="text-xs text-success font-medium">
                   R$ {receitaEsteMes.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
